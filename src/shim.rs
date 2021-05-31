@@ -25,40 +25,44 @@ extern "C" {
 }
 
 #[no_mangle]
-pub extern "C" fn malloc(size: size_t) -> *mut c_void {
+pub unsafe extern "C" fn malloc(size: size_t) -> *mut c_void {
     super::track_allocated(size);
-    unsafe { sys_malloc(size) }
+    sys_malloc(size)
 }
 
 #[no_mangle]
-pub extern "C" fn calloc(number: size_t, size: size_t) -> *mut c_void {
+pub unsafe extern "C" fn calloc(number: size_t, size: size_t) -> *mut c_void {
     super::track_allocated(size * number);
-    unsafe { sys_calloc(number, size) }
+    sys_calloc(number, size)
 }
 
 #[no_mangle]
-pub extern "C" fn free(ptr: *mut c_void) {
-    unsafe { sys_free(ptr) }
+pub unsafe extern "C" fn free(ptr: *mut c_void) {
+    sys_free(ptr)
 }
 
 #[no_mangle]
-pub extern "C" fn realloc(ptr: *mut c_void, size: size_t) -> *mut c_void {
+pub unsafe extern "C" fn realloc(ptr: *mut c_void, size: size_t) -> *mut c_void {
     super::track_allocated(size);
-    unsafe { sys_realloc(ptr, size) }
+    sys_realloc(ptr, size)
 }
 
 #[no_mangle]
-pub extern "C" fn malloc_usable_size(ptr: *const c_void) -> size_t {
-    unsafe { sys_malloc_usable_size(ptr) }
+pub unsafe extern "C" fn malloc_usable_size(ptr: *const c_void) -> size_t {
+    sys_malloc_usable_size(ptr)
 }
 
 #[no_mangle]
-pub extern "C" fn posix_memalign(ptr: *mut *mut c_void, alignment: size_t, size: size_t) -> c_int {
-    unsafe { sys_posix_memalign(ptr, alignment, size) }
+pub unsafe extern "C" fn posix_memalign(
+    ptr: *mut *mut c_void,
+    alignment: size_t,
+    size: size_t,
+) -> c_int {
+    sys_posix_memalign(ptr, alignment, size)
 }
 
 #[no_mangle]
-pub extern "C" fn aligned_alloc(alignment: size_t, size: size_t) -> *mut c_void {
+pub unsafe extern "C" fn aligned_alloc(alignment: size_t, size: size_t) -> *mut c_void {
     super::track_allocated(size); // TODO take alignment in account
-    unsafe { sys_aligned_alloc(alignment, size) }
+    sys_aligned_alloc(alignment, size)
 }
