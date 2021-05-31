@@ -27,13 +27,8 @@ impl StaticBacktrace {
         self.size += 1;
         self.size < MAX_DEPTH
     }
-}
 
-impl<'a> IntoIterator for &'a StaticBacktrace {
-    type Item = &'a Frame;
-    type IntoIter = StaticBacktraceIterator<'a>;
-
-    fn into_iter(self) -> Self::IntoIter {
+    fn iter<'a>(&'a self) -> StaticBacktraceIterator<'a> {
         StaticBacktraceIterator(self, 0)
     }
 }
@@ -54,45 +49,47 @@ impl<'a> Iterator for StaticBacktraceIterator<'a> {
     }
 }
 
+impl From<StaticBacktrace> for pprof::Frames {
+    fn from(bt: StaticBacktrace) -> Self {
+        let frames = bt
+            .iter()
+            .map(|frame| {
+                let mut symbols: Vec<pprof::Symbol> = Vec::new();
+                backtrace::resolve_frame(frame, |symbol| {
+                    if let Some(name) = symbol.name() {
+                        let name = format!("{:#}", name);
+                        symbols.push(pprof::Symbol {
+                            name: Some(name.as_bytes().to_vec()),
+                            addr: None,
+                            lineno: None,
+                            filename: None,
+                        })
+                    }
+                });
+                symbols
+            })
+            .collect();
+        Self {
+            frames,
+            thread_name: "".to_string(),
+            thread_id: 0,
+        }
+    }
+}
+
 pub(crate) unsafe fn track_allocated(size: usize) {
     println!("allocated {}", size);
 
     let mut bt = StaticBacktrace::new();
     backtrace::trace(|frame| bt.push(frame));
 
-    for frame in &bt {
+    for frame in bt.iter() {
         backtrace::resolve_frame(frame, |symbol| {
             if let Some(name) = symbol.name() {
                 println!("{:#}", name);
             }
         });
     }
-
-    /*
-    let mut bt = backtrace::Backtrace::new_unresolved();
-    bt.resolve();
-
-    for frame in bt.frames() {
-        for symbol in frame.symbols() {
-            if let Some(name) = symbol.name() {
-                println!("{:#}", name);
-            }
-        }
-    }
-     */
-
-    /*
-    backtrace::trace(|frame| {
-        backtrace::resolve_frame(frame, |symbol| {
-            if let Some(name) = symbol.name() {
-                println!("{:#}", name);
-            }
-        });
-
-        true // keep going to the next frame
-    });
-
-     */
 }
 
 pub fn demo() {
