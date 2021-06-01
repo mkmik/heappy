@@ -4,6 +4,7 @@
 //! [`aligned_alloc`].
 
 use backtrace::Frame;
+use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::sync::RwLock;
 
@@ -30,6 +31,17 @@ impl Profiler {
 struct StaticBacktrace {
     frames: [Frame; MAX_DEPTH],
     size: usize,
+}
+
+impl Clone for StaticBacktrace {
+    fn clone(&self) -> Self {
+        let mut n = unsafe { Self::new() };
+        for i in 0..self.size {
+            n.frames[i] = self.frames[i].clone()
+        }
+        n.size = self.size;
+        n
+    }
 }
 
 impl StaticBacktrace {
@@ -135,17 +147,24 @@ pub(crate) unsafe fn track_allocated(size: usize) {
 
 pub fn demo() {
     let profiler = HEAP_PROFILER.read().unwrap();
-    for entry in profiler.collector.try_iter().unwrap() {
-        print!("<root>");
-        for frame in entry.item.iter() {
-            backtrace::resolve_frame(frame, |symbol| {
-                if let Some(name) = symbol.name() {
-                    print!(";{:#}", name);
-                }
-            });
-        }
-        println!(" {}", entry.count);
-    }
 
-    println!("demo");
+    println!("DEMO");
+    let mut data: HashMap<pprof::Frames, isize> = HashMap::new();
+
+    for entry in profiler.collector.try_iter().unwrap() {
+        data.insert(entry.item.clone().into(), entry.count);
+    }
+    let report = pprof::Report { data };
+
+    let filename = "/tmp/memflame.svg";
+    println!("Writing to {}", filename);
+    let mut file = std::fs::File::create(filename).unwrap();
+    let mut options: pprof::flamegraph::Options = Default::default();
+
+    options.colors =
+        pprof::flamegraph::color::Palette::Basic(pprof::flamegraph::color::BasicPalette::Mem);
+
+    report
+        .flamegraph_with_options(&mut file, &mut options)
+        .unwrap();
 }

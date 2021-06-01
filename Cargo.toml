@@ -15,7 +15,7 @@ croaring = "0.5.0"
 libc = { version = "^0.2.8", default-features = false }
 tikv-jemallocator = {version = "0.4.0"}
 lazy_static = "1.4.0"
-pprof = "0.4.3"
+pprof = {version = "0.4.3", features = ["flamegraph"] }
 
 # tikv-jemallocator = {version = "0.4.0", features = ["unprefixed_malloc_on_supported_platforms"] }
 # tikv-jemalloc-sys = { version = "0.4", features = ["stats"] }
