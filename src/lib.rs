@@ -105,12 +105,14 @@ impl From<StaticBacktrace> for pprof::Frames {
                 backtrace::resolve_frame(frame, |symbol| {
                     if let Some(name) = symbol.name() {
                         let name = format!("{:#}", name);
-                        symbols.push(pprof::Symbol {
-                            name: Some(name.as_bytes().to_vec()),
-                            addr: None,
-                            lineno: None,
-                            filename: None,
-                        })
+                        if !name.starts_with("backtrace::") {
+                            symbols.push(pprof::Symbol {
+                                name: Some(name.as_bytes().to_vec()),
+                                addr: None,
+                                lineno: None,
+                                filename: None,
+                            })
+                        }
                     }
                 });
                 symbols
@@ -129,16 +131,6 @@ pub(crate) unsafe fn track_allocated(size: usize) {
 
     let mut bt = StaticBacktrace::new();
     backtrace::trace(|frame| bt.push(frame));
-
-    /*
-    for frame in bt.iter() {
-        backtrace::resolve_frame(frame, |symbol| {
-            if let Some(name) = symbol.name() {
-                println!("{:#}", name);
-            }
-        });
-    }
-     */
 
     let mut profiler = HEAP_PROFILER.write();
     let profiler = profiler.as_mut().unwrap();
@@ -161,6 +153,7 @@ pub fn demo() {
     let mut file = std::fs::File::create(filename).unwrap();
     let mut options: pprof::flamegraph::Options = Default::default();
 
+    options.count_name = "bytes".to_string();
     options.colors =
         pprof::flamegraph::color::Palette::Basic(pprof::flamegraph::color::BasicPalette::Mem);
 
