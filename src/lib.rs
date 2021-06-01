@@ -6,10 +6,11 @@
 use backtrace::Frame;
 use pprof::protos::Message;
 use spin::RwLock;
+use std::cell::Cell;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::io::Write;
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, Ordering};
 
 mod shim;
 
@@ -18,7 +19,6 @@ pub const MAX_DEPTH: usize = 32;
 lazy_static::lazy_static! {
     pub(crate) static ref HEAP_PROFILER: RwLock<Profiler> = RwLock::new(Profiler::new());
     pub(crate) static ref HEAP_PROFILER_ENABLED: AtomicBool = AtomicBool::new(false);
-    pub(crate) static ref HEAP_PROFILER_ENTERED: AtomicU32 = AtomicU32::new(0);
 }
 
 struct Profiler {
@@ -136,16 +136,24 @@ impl From<StaticBacktrace> for pprof::Frames {
 }
 
 pub(crate) unsafe fn track_allocated(size: usize) {
-    if HEAP_PROFILER_ENABLED.load(Ordering::SeqCst) {
-        if HEAP_PROFILER_ENTERED.load(Ordering::SeqCst) == 0 {
-            HEAP_PROFILER_ENTERED.fetch_add(1, Ordering::SeqCst);
+    thread_local!(static ENTERED: Cell<bool> = Cell::new(false));
+
+    struct ResetOnDrop;
+
+    impl Drop for ResetOnDrop {
+        fn drop(&mut self) {
+            ENTERED.with(|b| b.set(false));
+        }
+    }
+
+    if !ENTERED.with(|b| b.replace(true)) {
+        let _reset_on_drop = ResetOnDrop;
+        if HEAP_PROFILER_ENABLED.load(Ordering::SeqCst) {
             let mut bt = StaticBacktrace::new();
             backtrace::trace(|frame| bt.push(frame));
 
             let mut profiler = HEAP_PROFILER.write();
             profiler.collector.add(bt, size as isize).unwrap();
-
-            HEAP_PROFILER_ENTERED.fetch_sub(1, Ordering::SeqCst);
         }
     }
 }
