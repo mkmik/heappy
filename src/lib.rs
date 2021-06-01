@@ -17,15 +17,36 @@ mod shim;
 pub const MAX_DEPTH: usize = 32;
 
 lazy_static::lazy_static! {
-    pub(crate) static ref HEAP_PROFILER: RwLock<Profiler> = RwLock::new(Profiler::new());
-    pub(crate) static ref HEAP_PROFILER_ENABLED: AtomicBool = AtomicBool::new(false);
+    pub(crate) static ref HEAP_PROFILER: Profiler = Profiler::new();
 }
 
 struct Profiler {
-    collector: pprof::Collector<StaticBacktrace>,
+    state: RwLock<State>,
+    enabled: AtomicBool,
 }
 
 impl Profiler {
+    fn new() -> Self {
+        Self {
+            state: RwLock::new(State::new()),
+            enabled: AtomicBool::new(false),
+        }
+    }
+
+    fn enabled(&self) -> bool {
+        self.enabled.load(Ordering::SeqCst)
+    }
+
+    fn set_enabled(&self, value: bool) {
+        self.enabled.store(value, Ordering::SeqCst)
+    }
+}
+
+struct State {
+    collector: pprof::Collector<StaticBacktrace>,
+}
+
+impl State {
     fn new() -> Self {
         Self {
             collector: pprof::Collector::new().unwrap(),
@@ -148,24 +169,24 @@ pub(crate) unsafe fn track_allocated(size: usize) {
 
     if !ENTERED.with(|b| b.replace(true)) {
         let _reset_on_drop = ResetOnDrop;
-        if HEAP_PROFILER_ENABLED.load(Ordering::SeqCst) {
+        if HEAP_PROFILER.enabled() {
             let mut bt = StaticBacktrace::new();
             backtrace::trace(|frame| bt.push(frame));
 
-            let mut profiler = HEAP_PROFILER.write();
+            let mut profiler = HEAP_PROFILER.state.write();
             profiler.collector.add(bt, size as isize).unwrap();
         }
     }
 }
 
 pub fn start_demo() {
-    HEAP_PROFILER_ENABLED.store(true, Ordering::SeqCst);
+    HEAP_PROFILER.set_enabled(true);
 }
 
 pub fn finalize_demo() {
-    HEAP_PROFILER_ENABLED.store(false, Ordering::SeqCst);
+    HEAP_PROFILER.set_enabled(false);
 
-    let profiler = HEAP_PROFILER.read();
+    let profiler = HEAP_PROFILER.state.read();
 
     println!("DEMO");
     let mut data: HashMap<pprof::Frames, isize> = HashMap::new();

@@ -1,10 +1,5 @@
 use croaring::Bitmap;
 
-use tikv_jemallocator::Jemalloc;
-
-// #[global_allocator]
-// static GLOBAL: Jemalloc = Jemalloc;
-
 #[derive(Debug)]
 struct Foo {
     i: i32,
