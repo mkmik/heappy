@@ -110,7 +110,10 @@ impl From<StaticBacktrace> for pprof::Frames {
                 backtrace::resolve_frame(frame, |symbol| {
                     if let Some(name) = symbol.name() {
                         let name = format!("{:#}", name);
-                        if !name.starts_with("backtrace::") && !name.ends_with("::track_allocated")
+                        if !name.starts_with("backtrace::")
+                            && !name.ends_with("::track_allocated")
+                            && !name.starts_with("alloc::alloc::")
+                            && name != "<alloc::alloc::Global as core::alloc::Allocator>::allocate"
                         {
                             symbols.push(pprof::Symbol {
                                 name: Some(name.as_bytes().to_vec()),
