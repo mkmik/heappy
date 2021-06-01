@@ -4,9 +4,11 @@
 //! [`aligned_alloc`].
 
 use backtrace::Frame;
+use pprof::protos::Message;
+use spin::RwLock;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
-use std::sync::RwLock;
+use std::io::Write;
 
 mod shim;
 
@@ -105,7 +107,8 @@ impl From<StaticBacktrace> for pprof::Frames {
                 backtrace::resolve_frame(frame, |symbol| {
                     if let Some(name) = symbol.name() {
                         let name = format!("{:#}", name);
-                        if !name.starts_with("backtrace::") {
+                        if !name.starts_with("backtrace::") && !name.ends_with("::track_allocated")
+                        {
                             symbols.push(pprof::Symbol {
                                 name: Some(name.as_bytes().to_vec()),
                                 addr: None,
@@ -127,18 +130,17 @@ impl From<StaticBacktrace> for pprof::Frames {
 }
 
 pub(crate) unsafe fn track_allocated(size: usize) {
-    println!("allocated {}", size);
+    // println!("allocated {}", size);
 
     let mut bt = StaticBacktrace::new();
     backtrace::trace(|frame| bt.push(frame));
 
     let mut profiler = HEAP_PROFILER.write();
-    let profiler = profiler.as_mut().unwrap();
     profiler.collector.add(bt, size as isize).unwrap();
 }
 
 pub fn demo() {
-    let profiler = HEAP_PROFILER.read().unwrap();
+    let profiler = HEAP_PROFILER.read();
 
     println!("DEMO");
     let mut data: HashMap<pprof::Frames, isize> = HashMap::new();
@@ -160,4 +162,11 @@ pub fn demo() {
     report
         .flamegraph_with_options(&mut file, &mut options)
         .unwrap();
+
+    let mut buf = vec![];
+    report.pprof().unwrap().encode(&mut buf).unwrap();
+    let filename = "/tmp/memflame.pb";
+    println!("Writing to {}", filename);
+    let mut file = std::fs::File::create(filename).unwrap();
+    file.write_all(&buf).unwrap();
 }
