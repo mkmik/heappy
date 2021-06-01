@@ -2,8 +2,8 @@ use croaring::Bitmap;
 
 use tikv_jemallocator::Jemalloc;
 
-#[global_allocator]
-static GLOBAL: Jemalloc = Jemalloc;
+// #[global_allocator]
+// static GLOBAL: Jemalloc = Jemalloc;
 
 #[derive(Debug)]
 struct Foo {
@@ -36,6 +36,8 @@ fn foo(fs: &[Foo]) {
 }
 
 fn main() {
+    ruback::start_demo();
+
     let mut rb1 = Bitmap::create();
     rb1.add(1);
     rb1.add(2);
@@ -56,5 +58,5 @@ fn main() {
     foo(&m);
     //}
 
-    ruback::demo();
+    ruback::finalize_demo();
 }
