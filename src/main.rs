@@ -36,8 +36,6 @@ fn foo(fs: &[Foo]) {
 }
 
 fn main() {
-    ruback::demo();
-
     let mut rb1 = Bitmap::create();
     rb1.add(1);
     rb1.add(2);
@@ -57,4 +55,6 @@ fn main() {
 
     foo(&m);
     //}
+
+    ruback::demo();
 }

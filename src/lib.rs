@@ -4,10 +4,28 @@
 //! [`aligned_alloc`].
 
 use backtrace::Frame;
+use std::hash::{Hash, Hasher};
+use std::sync::RwLock;
 
 mod shim;
 
 pub const MAX_DEPTH: usize = 32;
+
+lazy_static::lazy_static! {
+    pub(crate) static ref HEAP_PROFILER: RwLock<Profiler> = RwLock::new(Profiler::new());
+}
+
+struct Profiler {
+    collector: pprof::Collector<StaticBacktrace>,
+}
+
+impl Profiler {
+    fn new() -> Self {
+        Self {
+            collector: pprof::Collector::new().unwrap(),
+        }
+    }
+}
 
 struct StaticBacktrace {
     frames: [Frame; MAX_DEPTH],
@@ -32,6 +50,23 @@ impl StaticBacktrace {
         StaticBacktraceIterator(self, 0)
     }
 }
+
+impl Hash for StaticBacktrace {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.iter()
+            .for_each(|frame| frame.symbol_address().hash(state));
+    }
+}
+
+impl PartialEq for StaticBacktrace {
+    fn eq(&self, other: &Self) -> bool {
+        Iterator::zip(self.iter(), other.iter())
+            .map(|(s1, s2)| s1.symbol_address() == s2.symbol_address())
+            .all(|equal| equal)
+    }
+}
+
+impl Eq for StaticBacktrace {}
 
 struct StaticBacktraceIterator<'a>(&'a StaticBacktrace, usize);
 
@@ -83,6 +118,7 @@ pub(crate) unsafe fn track_allocated(size: usize) {
     let mut bt = StaticBacktrace::new();
     backtrace::trace(|frame| bt.push(frame));
 
+    /*
     for frame in bt.iter() {
         backtrace::resolve_frame(frame, |symbol| {
             if let Some(name) = symbol.name() {
@@ -90,8 +126,26 @@ pub(crate) unsafe fn track_allocated(size: usize) {
             }
         });
     }
+     */
+
+    let mut profiler = HEAP_PROFILER.write();
+    let profiler = profiler.as_mut().unwrap();
+    profiler.collector.add(bt, size as isize).unwrap();
 }
 
 pub fn demo() {
+    let profiler = HEAP_PROFILER.read().unwrap();
+    for entry in profiler.collector.try_iter().unwrap() {
+        print!("<root>");
+        for frame in entry.item.iter() {
+            backtrace::resolve_frame(frame, |symbol| {
+                if let Some(name) = symbol.name() {
+                    print!(";{:#}", name);
+                }
+            });
+        }
+        println!(" {}", entry.count);
+    }
+
     println!("demo");
 }
