@@ -188,8 +188,24 @@ pub fn finalize_demo() {
         .flamegraph_with_options(&mut file, &mut options)
         .unwrap();
 
+    // The pprof crate currently only supports sampling cpu.
+    // But other than that it does exactly the work we need, so instead of
+    // duplicating the pprof proto generation code here, we're just fixing up the "legend".
+    // There is work underway to add this natively to pprof-rs https://github.com/tikv/pprof-rs/pull/45
+    let mut proto = report.pprof().unwrap();
+    let (type_idx, unit_idx) = (proto.string_table.len(), proto.string_table.len() + 1);
+    proto.string_table.push("space".to_owned());
+    proto.string_table.push("bytes".to_owned());
+    let sample_type = pprof::protos::ValueType {
+        r#type: type_idx as i64,
+        unit: unit_idx as i64,
+    };
+    proto.sample_type = vec![sample_type];
+    proto.string_table[68] = "space".to_string();
+    proto.string_table[69] = "bytes".to_string();
+
     let mut buf = vec![];
-    report.pprof().unwrap().encode(&mut buf).unwrap();
+    proto.encode(&mut buf).unwrap();
     let filename = "/tmp/memflame.pb";
     println!("Writing to {}", filename);
     let mut file = std::fs::File::create(filename).unwrap();
