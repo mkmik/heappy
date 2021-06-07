@@ -11,18 +11,18 @@ mod shim;
 const MAX_DEPTH: usize = 32;
 
 lazy_static::lazy_static! {
-    static ref HEAP_PROFILER: Profiler = Profiler::new();
+    static ref HEAP_PROFILER: Profiler<MAX_DEPTH> = Profiler::new();
 }
 
-struct Profiler {
-    state: RwLock<State>,
+struct Profiler<const N: usize> {
+    state: RwLock<ProfilerState<N>>,
     enabled: AtomicBool,
 }
 
-impl Profiler {
+impl<const N: usize> Profiler<N> {
     fn new() -> Self {
         Self {
-            state: RwLock::new(State::new()),
+            state: RwLock::new(ProfilerState::new()),
             enabled: AtomicBool::new(false),
         }
     }
@@ -119,11 +119,12 @@ impl HeapReport {
     }
 }
 
-struct State {
-    collector: pprof::Collector<Frames>,
+// Current profiler state, collection of sampled frames.
+struct ProfilerState<const N: usize> {
+    collector: pprof::Collector<Frames<N>>,
 }
 
-impl State {
+impl<const N: usize> ProfilerState<N> {
     fn new() -> Self {
         Self {
             collector: pprof::Collector::new().unwrap(),
@@ -131,12 +132,12 @@ impl State {
     }
 }
 
-struct Frames {
-    frames: [Frame; MAX_DEPTH],
+struct Frames<const N: usize> {
+    frames: [Frame; N],
     size: usize,
 }
 
-impl Clone for Frames {
+impl<const N: usize> Clone for Frames<N> {
     fn clone(&self) -> Self {
         let mut n = unsafe { Self::new() };
         for i in 0..self.size {
@@ -147,7 +148,7 @@ impl Clone for Frames {
     }
 }
 
-impl Frames {
+impl<const N: usize> Frames<N> {
     unsafe fn new() -> Self {
         Self {
             frames: std::mem::MaybeUninit::uninit().assume_init(),
@@ -155,26 +156,26 @@ impl Frames {
         }
     }
 
-    /// Push will push up to MAX_DEPTH frames in the frames array.
+    /// Push will push up to N frames in the frames array.
     unsafe fn push(&mut self, frame: &Frame) -> bool {
         self.frames[self.size] = frame.clone();
         self.size += 1;
-        self.size < MAX_DEPTH
+        self.size < N
     }
 
-    fn iter(&self) -> FramesIterator {
+    fn iter(&self) -> FramesIterator<N> {
         FramesIterator(self, 0)
     }
 }
 
-impl Hash for Frames {
+impl<const N: usize> Hash for Frames<N> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.iter()
             .for_each(|frame| frame.symbol_address().hash(state));
     }
 }
 
-impl PartialEq for Frames {
+impl<const N: usize> PartialEq for Frames<N> {
     fn eq(&self, other: &Self) -> bool {
         Iterator::zip(self.iter(), other.iter())
             .map(|(s1, s2)| s1.symbol_address() == s2.symbol_address())
@@ -182,11 +183,11 @@ impl PartialEq for Frames {
     }
 }
 
-impl Eq for Frames {}
+impl<const N: usize> Eq for Frames<N> {}
 
-struct FramesIterator<'a>(&'a Frames, usize);
+struct FramesIterator<'a, const N: usize>(&'a Frames<N>, usize);
 
-impl<'a> Iterator for FramesIterator<'a> {
+impl<'a, const N: usize> Iterator for FramesIterator<'a, N> {
     type Item = &'a Frame;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -200,8 +201,8 @@ impl<'a> Iterator for FramesIterator<'a> {
     }
 }
 
-impl From<Frames> for pprof::Frames {
-    fn from(bt: Frames) -> Self {
+impl<const N: usize> From<Frames<N>> for pprof::Frames {
+    fn from(bt: Frames<N>) -> Self {
         let frames = bt
             .iter()
             .map(|frame| {
