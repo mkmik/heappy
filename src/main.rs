@@ -32,7 +32,7 @@ fn foo(fs: &[Foo]) {
     }
 }
 
-fn main() {
+fn demo() {
     let heap_profiler_guard = ruback::HeapProfilerGuard::new();
 
     let mut rb1 = Bitmap::create();
@@ -70,4 +70,10 @@ fn main() {
     println!("Writing to {}", filename);
     let mut file = std::fs::File::create(filename).unwrap();
     file.write_all(&buf).unwrap();
+}
+
+fn main() {
+    println!("start demo");
+    demo();
+    println!("end demo");
 }

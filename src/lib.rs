@@ -112,8 +112,8 @@ impl HeapReport {
             unit: unit_idx as i64,
         };
         proto.sample_type = vec![sample_type];
-        proto.string_table[68] = "space".to_string();
-        proto.string_table[69] = "bytes".to_string();
+        proto.string_table[type_idx] = "space".to_string();
+        proto.string_table[unit_idx] = "bytes".to_string();
 
         proto
     }
