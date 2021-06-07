@@ -35,6 +35,8 @@ fn foo(fs: &[Foo]) {
 fn demo() {
     let heap_profiler_guard = ruback::HeapProfilerGuard::new();
 
+    println!("start demo");
+
     let mut rb1 = Bitmap::create();
     rb1.add(1);
     rb1.add(2);
@@ -73,7 +75,6 @@ fn demo() {
 }
 
 fn main() {
-    println!("start demo");
     demo();
     println!("end demo");
 }
