@@ -6,6 +6,7 @@ use std::hash::{Hash, Hasher};
 use std::io::Write;
 use std::sync::atomic::{AtomicBool, Ordering};
 
+#[cfg(target_os = "macos")]
 mod shim;
 
 const MAX_DEPTH: usize = 32;
