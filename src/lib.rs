@@ -6,8 +6,8 @@ use std::hash::{Hash, Hasher};
 use std::io::Write;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-#[cfg(target_os = "macos")]
-mod shim;
+#[cfg(any(target_os = "macos", feature = "jemalloc_shim"))]
+mod jemalloc_shim;
 
 const MAX_DEPTH: usize = 32;
 

@@ -9,6 +9,9 @@ edition = "2018"
 [profile.release]
 debug = true
 
+[features]
+jemalloc_shim = []
+
 [dependencies]
 backtrace = "0.3.59"
 croaring = "0.5.0"
