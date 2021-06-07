@@ -10,29 +10,45 @@ mod shim;
 
 const MAX_DEPTH: usize = 32;
 
+static HEAP_PROFILER_ENABLED: AtomicBool = AtomicBool::new(false);
+
 lazy_static::lazy_static! {
-    static ref HEAP_PROFILER: Profiler<MAX_DEPTH> = Profiler::new();
+    static ref HEAP_PROFILER_STATE: RwLock<ProfilerState<MAX_DEPTH>> = RwLock::new(ProfilerState::new());
 }
 
-struct Profiler<const N: usize> {
-    state: RwLock<ProfilerState<N>>,
-    enabled: AtomicBool,
-}
+struct Profiler;
 
-impl<const N: usize> Profiler<N> {
-    fn new() -> Self {
-        Self {
-            state: RwLock::new(ProfilerState::new()),
-            enabled: AtomicBool::new(false),
+impl Profiler {
+    fn enabled() -> bool {
+        HEAP_PROFILER_ENABLED.load(Ordering::SeqCst)
+    }
+
+    fn set_enabled(value: bool) {
+        HEAP_PROFILER_ENABLED.store(value, Ordering::SeqCst)
+    }
+
+    // Called by malloc hooks to record a memory allocation event.
+    pub(crate) unsafe fn track_allocated(size: usize) {
+        thread_local!(static ENTERED: Cell<bool> = Cell::new(false));
+
+        struct ResetOnDrop;
+
+        impl Drop for ResetOnDrop {
+            fn drop(&mut self) {
+                ENTERED.with(|b| b.set(false));
+            }
         }
-    }
 
-    fn enabled(&self) -> bool {
-        self.enabled.load(Ordering::SeqCst)
-    }
+        if !ENTERED.with(|b| b.replace(true)) {
+            let _reset_on_drop = ResetOnDrop;
+            if Self::enabled() {
+                let mut bt = Frames::new();
+                backtrace::trace(|frame| bt.push(frame));
 
-    fn set_enabled(&self, value: bool) {
-        self.enabled.store(value, Ordering::SeqCst)
+                let mut profiler = HEAP_PROFILER_STATE.write();
+                profiler.collector.add(bt, size as isize).unwrap();
+            }
+        }
     }
 }
 
@@ -41,7 +57,7 @@ pub struct HeapProfilerGuard {}
 
 impl HeapProfilerGuard {
     pub fn new() -> Self {
-        HEAP_PROFILER.set_enabled(true);
+        Profiler::set_enabled(true);
         Self {}
     }
 
@@ -59,7 +75,7 @@ impl Default for HeapProfilerGuard {
 
 impl Drop for HeapProfilerGuard {
     fn drop(&mut self) {
-        HEAP_PROFILER.set_enabled(false);
+        Profiler::set_enabled(false);
     }
 }
 
@@ -70,7 +86,7 @@ pub struct HeapReport {
 
 impl HeapReport {
     fn new() -> Self {
-        let profiler = HEAP_PROFILER.state.read();
+        let profiler = HEAP_PROFILER_STATE.read();
 
         let mut data: HashMap<pprof::Frames, isize> = HashMap::new();
 
@@ -231,30 +247,6 @@ impl<const N: usize> From<Frames<N>> for pprof::Frames {
             frames,
             thread_name: "".to_string(),
             thread_id: 0,
-        }
-    }
-}
-
-// Called by malloc hooks to record a memory allocation event.
-pub(crate) unsafe fn track_allocated(size: usize) {
-    thread_local!(static ENTERED: Cell<bool> = Cell::new(false));
-
-    struct ResetOnDrop;
-
-    impl Drop for ResetOnDrop {
-        fn drop(&mut self) {
-            ENTERED.with(|b| b.set(false));
-        }
-    }
-
-    if !ENTERED.with(|b| b.replace(true)) {
-        let _reset_on_drop = ResetOnDrop;
-        if HEAP_PROFILER.enabled() {
-            let mut bt = Frames::new();
-            backtrace::trace(|frame| bt.push(frame));
-
-            let mut profiler = HEAP_PROFILER.state.write();
-            profiler.collector.add(bt, size as isize).unwrap();
         }
     }
 }

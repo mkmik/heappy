@@ -3,6 +3,7 @@
 //! [`posix_memalign`] which conforms to conforms to POSIX.1-2016, and
 //! [`aligned_alloc`].
 
+use super::Profiler;
 use libc::{c_int, c_void, size_t};
 
 #[link(name = "jemalloc")]
@@ -31,13 +32,13 @@ extern "C" {
 
 #[no_mangle]
 pub unsafe extern "C" fn malloc(size: size_t) -> *mut c_void {
-    super::track_allocated(size);
+    Profiler::track_allocated(size);
     sys_malloc(size)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn calloc(number: size_t, size: size_t) -> *mut c_void {
-    super::track_allocated(size * number);
+    Profiler::track_allocated(size * number);
     sys_calloc(number, size)
 }
 
@@ -48,7 +49,7 @@ pub unsafe extern "C" fn free(ptr: *mut c_void) {
 
 #[no_mangle]
 pub unsafe extern "C" fn realloc(ptr: *mut c_void, size: size_t) -> *mut c_void {
-    super::track_allocated(size);
+    Profiler::track_allocated(size);
     sys_realloc(ptr, size)
 }
 
@@ -68,6 +69,6 @@ pub unsafe extern "C" fn posix_memalign(
 
 #[no_mangle]
 pub unsafe extern "C" fn aligned_alloc(alignment: size_t, size: size_t) -> *mut c_void {
-    super::track_allocated(size); // TODO take alignment in account
+    Profiler::track_allocated(size); // TODO take alignment in account
     sys_aligned_alloc(alignment, size)
 }
