@@ -17,6 +17,33 @@ lazy_static::lazy_static! {
     static ref HEAP_PROFILER_STATE: RwLock<ProfilerState<MAX_DEPTH>> = RwLock::new(ProfilerState::new());
 }
 
+/// RAII structure used to stop profiling when dropped. It is the only interface to access the heap profiler.
+pub struct HeapProfilerGuard {}
+
+impl HeapProfilerGuard {
+    pub fn new() -> Self {
+        Profiler::set_enabled(true);
+        Self {}
+    }
+
+    pub fn report(self) -> HeapReport {
+        std::mem::drop(self);
+        HeapReport::new()
+    }
+}
+
+impl Default for HeapProfilerGuard {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Drop for HeapProfilerGuard {
+    fn drop(&mut self) {
+        Profiler::set_enabled(false);
+    }
+}
+
 struct Profiler;
 
 impl Profiler {
@@ -50,33 +77,6 @@ impl Profiler {
                 profiler.collector.add(bt, size as isize).unwrap();
             }
         }
-    }
-}
-
-/// RAII structure used to stop profiling when dropped. It is the only interface to access the heap profiler.
-pub struct HeapProfilerGuard {}
-
-impl HeapProfilerGuard {
-    pub fn new() -> Self {
-        Profiler::set_enabled(true);
-        Self {}
-    }
-
-    pub fn report(self) -> HeapReport {
-        std::mem::drop(self);
-        HeapReport::new()
-    }
-}
-
-impl Default for HeapProfilerGuard {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl Drop for HeapProfilerGuard {
-    fn drop(&mut self) {
-        Profiler::set_enabled(false);
     }
 }
 
