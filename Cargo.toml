@@ -10,7 +10,9 @@ edition = "2018"
 debug = true
 
 [features]
+default = []
 jemalloc_shim = []
+enable_heap_profiler = ["jemalloc_shim"]
 
 [dependencies]
 backtrace = "0.3.59"

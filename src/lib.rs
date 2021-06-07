@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use backtrace::Frame;
 use spin::RwLock;
 use std::cell::Cell;
@@ -6,7 +8,7 @@ use std::hash::{Hash, Hasher};
 use std::io::Write;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-#[cfg(any(target_os = "macos", feature = "jemalloc_shim"))]
+#[cfg(feature = "jemalloc_shim")]
 mod jemalloc_shim;
 
 const MAX_DEPTH: usize = 32;
