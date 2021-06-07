@@ -8,7 +8,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 mod shim;
 
-pub const MAX_DEPTH: usize = 32;
+const MAX_DEPTH: usize = 32;
 
 lazy_static::lazy_static! {
     static ref HEAP_PROFILER: Profiler = Profiler::new();
@@ -48,6 +48,12 @@ impl HeapProfilerGuard {
     pub fn report(self) -> HeapReport {
         std::mem::drop(self);
         HeapReport::new()
+    }
+}
+
+impl Default for HeapProfilerGuard {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -114,7 +120,7 @@ impl HeapReport {
 }
 
 struct State {
-    collector: pprof::Collector<StaticBacktrace>,
+    collector: pprof::Collector<Frames>,
 }
 
 impl State {
@@ -125,12 +131,12 @@ impl State {
     }
 }
 
-struct StaticBacktrace {
+struct Frames {
     frames: [Frame; MAX_DEPTH],
     size: usize,
 }
 
-impl Clone for StaticBacktrace {
+impl Clone for Frames {
     fn clone(&self) -> Self {
         let mut n = unsafe { Self::new() };
         for i in 0..self.size {
@@ -141,7 +147,7 @@ impl Clone for StaticBacktrace {
     }
 }
 
-impl StaticBacktrace {
+impl Frames {
     unsafe fn new() -> Self {
         Self {
             frames: std::mem::MaybeUninit::uninit().assume_init(),
@@ -149,25 +155,26 @@ impl StaticBacktrace {
         }
     }
 
+    /// Push will push up to MAX_DEPTH frames in the frames array.
     unsafe fn push(&mut self, frame: &Frame) -> bool {
         self.frames[self.size] = frame.clone();
         self.size += 1;
         self.size < MAX_DEPTH
     }
 
-    fn iter<'a>(&'a self) -> StaticBacktraceIterator<'a> {
-        StaticBacktraceIterator(self, 0)
+    fn iter(&self) -> FramesIterator {
+        FramesIterator(self, 0)
     }
 }
 
-impl Hash for StaticBacktrace {
+impl Hash for Frames {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.iter()
             .for_each(|frame| frame.symbol_address().hash(state));
     }
 }
 
-impl PartialEq for StaticBacktrace {
+impl PartialEq for Frames {
     fn eq(&self, other: &Self) -> bool {
         Iterator::zip(self.iter(), other.iter())
             .map(|(s1, s2)| s1.symbol_address() == s2.symbol_address())
@@ -175,11 +182,11 @@ impl PartialEq for StaticBacktrace {
     }
 }
 
-impl Eq for StaticBacktrace {}
+impl Eq for Frames {}
 
-struct StaticBacktraceIterator<'a>(&'a StaticBacktrace, usize);
+struct FramesIterator<'a>(&'a Frames, usize);
 
-impl<'a> Iterator for StaticBacktraceIterator<'a> {
+impl<'a> Iterator for FramesIterator<'a> {
     type Item = &'a Frame;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -193,8 +200,8 @@ impl<'a> Iterator for StaticBacktraceIterator<'a> {
     }
 }
 
-impl From<StaticBacktrace> for pprof::Frames {
-    fn from(bt: StaticBacktrace) -> Self {
+impl From<Frames> for pprof::Frames {
+    fn from(bt: Frames) -> Self {
         let frames = bt
             .iter()
             .map(|frame| {
@@ -227,6 +234,7 @@ impl From<StaticBacktrace> for pprof::Frames {
     }
 }
 
+// Called by malloc hooks to record a memory allocation event.
 pub(crate) unsafe fn track_allocated(size: usize) {
     thread_local!(static ENTERED: Cell<bool> = Cell::new(false));
 
@@ -241,7 +249,7 @@ pub(crate) unsafe fn track_allocated(size: usize) {
     if !ENTERED.with(|b| b.replace(true)) {
         let _reset_on_drop = ResetOnDrop;
         if HEAP_PROFILER.enabled() {
-            let mut bt = StaticBacktrace::new();
+            let mut bt = Frames::new();
             backtrace::trace(|frame| bt.push(frame));
 
             let mut profiler = HEAP_PROFILER.state.write();
