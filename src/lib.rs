@@ -1,10 +1,4 @@
-//! The standard API includes: the [`malloc`], [`calloc`], [`realloc`], and
-//! [`free`], which conform to to ISO/IEC 9899:1990 (“ISO C90”),
-//! [`posix_memalign`] which conforms to conforms to POSIX.1-2016, and
-//! [`aligned_alloc`].
-
 use backtrace::Frame;
-use pprof::protos::Message;
 use spin::RwLock;
 use std::cell::Cell;
 use std::collections::HashMap;
@@ -17,7 +11,7 @@ mod shim;
 pub const MAX_DEPTH: usize = 32;
 
 lazy_static::lazy_static! {
-    pub(crate) static ref HEAP_PROFILER: Profiler = Profiler::new();
+    static ref HEAP_PROFILER: Profiler = Profiler::new();
 }
 
 struct Profiler {
@@ -39,6 +33,83 @@ impl Profiler {
 
     fn set_enabled(&self, value: bool) {
         self.enabled.store(value, Ordering::SeqCst)
+    }
+}
+
+/// RAII structure used to stop profiling when dropped. It is the only interface to access the heap profiler.
+pub struct HeapProfilerGuard {}
+
+impl HeapProfilerGuard {
+    pub fn new() -> Self {
+        HEAP_PROFILER.set_enabled(true);
+        Self {}
+    }
+
+    pub fn report(self) -> HeapReport {
+        std::mem::drop(self);
+        HeapReport::new()
+    }
+}
+
+impl Drop for HeapProfilerGuard {
+    fn drop(&mut self) {
+        HEAP_PROFILER.set_enabled(false);
+    }
+}
+
+#[derive(Debug)]
+pub struct HeapReport {
+    report: pprof::Report,
+}
+
+impl HeapReport {
+    fn new() -> Self {
+        let profiler = HEAP_PROFILER.state.read();
+
+        let mut data: HashMap<pprof::Frames, isize> = HashMap::new();
+
+        for entry in profiler.collector.try_iter().unwrap() {
+            data.insert(entry.item.clone().into(), entry.count);
+        }
+        let report = pprof::Report { data };
+        Self { report }
+    }
+
+    /// flamegraph will write an svg flamegraph into writer.
+    pub fn flamegraph<W>(&self, writer: W)
+    where
+        W: Write,
+    {
+        let mut options: pprof::flamegraph::Options = Default::default();
+
+        options.count_name = "bytes".to_string();
+        options.colors =
+            pprof::flamegraph::color::Palette::Basic(pprof::flamegraph::color::BasicPalette::Mem);
+
+        self.report
+            .flamegraph_with_options(writer, &mut options)
+            .unwrap();
+    }
+
+    /// produce a pprof proto (for use with go tool pprof and compatible visualizers)
+    pub fn pprof(&self) -> pprof::protos::Profile {
+        // The pprof crate currently only supports sampling cpu.
+        // But other than that it does exactly the work we need, so instead of
+        // duplicating the pprof proto generation code here, we're just fixing up the "legend".
+        // There is work underway to add this natively to pprof-rs https://github.com/tikv/pprof-rs/pull/45
+        let mut proto = self.report.pprof().unwrap();
+        let (type_idx, unit_idx) = (proto.string_table.len(), proto.string_table.len() + 1);
+        proto.string_table.push("space".to_owned());
+        proto.string_table.push("bytes".to_owned());
+        let sample_type = pprof::protos::ValueType {
+            r#type: type_idx as i64,
+            unit: unit_idx as i64,
+        };
+        proto.sample_type = vec![sample_type];
+        proto.string_table[68] = "space".to_string();
+        proto.string_table[69] = "bytes".to_string();
+
+        proto
     }
 }
 
@@ -177,58 +248,4 @@ pub(crate) unsafe fn track_allocated(size: usize) {
             profiler.collector.add(bt, size as isize).unwrap();
         }
     }
-}
-
-pub fn start_demo() {
-    HEAP_PROFILER.set_enabled(true);
-}
-
-pub fn finalize_demo() {
-    HEAP_PROFILER.set_enabled(false);
-
-    let profiler = HEAP_PROFILER.state.read();
-
-    println!("DEMO");
-    let mut data: HashMap<pprof::Frames, isize> = HashMap::new();
-
-    for entry in profiler.collector.try_iter().unwrap() {
-        data.insert(entry.item.clone().into(), entry.count);
-    }
-    let report = pprof::Report { data };
-
-    let filename = "/tmp/memflame.svg";
-    println!("Writing to {}", filename);
-    let mut file = std::fs::File::create(filename).unwrap();
-    let mut options: pprof::flamegraph::Options = Default::default();
-
-    options.count_name = "bytes".to_string();
-    options.colors =
-        pprof::flamegraph::color::Palette::Basic(pprof::flamegraph::color::BasicPalette::Mem);
-
-    report
-        .flamegraph_with_options(&mut file, &mut options)
-        .unwrap();
-
-    // The pprof crate currently only supports sampling cpu.
-    // But other than that it does exactly the work we need, so instead of
-    // duplicating the pprof proto generation code here, we're just fixing up the "legend".
-    // There is work underway to add this natively to pprof-rs https://github.com/tikv/pprof-rs/pull/45
-    let mut proto = report.pprof().unwrap();
-    let (type_idx, unit_idx) = (proto.string_table.len(), proto.string_table.len() + 1);
-    proto.string_table.push("space".to_owned());
-    proto.string_table.push("bytes".to_owned());
-    let sample_type = pprof::protos::ValueType {
-        r#type: type_idx as i64,
-        unit: unit_idx as i64,
-    };
-    proto.sample_type = vec![sample_type];
-    proto.string_table[68] = "space".to_string();
-    proto.string_table[69] = "bytes".to_string();
-
-    let mut buf = vec![];
-    proto.encode(&mut buf).unwrap();
-    let filename = "/tmp/memflame.pb";
-    println!("Writing to {}", filename);
-    let mut file = std::fs::File::create(filename).unwrap();
-    file.write_all(&buf).unwrap();
 }

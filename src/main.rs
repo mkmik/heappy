@@ -1,4 +1,6 @@
 use croaring::Bitmap;
+use pprof::protos::Message;
+use std::io::Write;
 
 #[derive(Debug)]
 struct Foo {
@@ -31,7 +33,7 @@ fn foo(fs: &[Foo]) {
 }
 
 fn main() {
-    ruback::start_demo();
+    let heap_profiler_guard = ruback::HeapProfilerGuard::new();
 
     let mut rb1 = Bitmap::create();
     rb1.add(1);
@@ -53,5 +55,19 @@ fn main() {
     foo(&m);
     //}
 
-    ruback::finalize_demo();
+    let report = heap_profiler_guard.report();
+
+    let filename = "/tmp/memflame.svg";
+    println!("Writing to {}", filename);
+    let mut file = std::fs::File::create(filename).unwrap();
+    report.flamegraph(&mut file);
+
+    let proto = report.pprof();
+
+    let mut buf = vec![];
+    proto.encode(&mut buf).unwrap();
+    let filename = "/tmp/memflame.pb";
+    println!("Writing to {}", filename);
+    let mut file = std::fs::File::create(filename).unwrap();
+    file.write_all(&buf).unwrap();
 }
