@@ -133,16 +133,16 @@ impl HeapReport {
         // duplicating the pprof proto generation code here, we're just fixing up the "legend".
         // There is work underway to add this natively to pprof-rs https://github.com/tikv/pprof-rs/pull/45
         let mut proto = self.report.pprof().unwrap();
+
         let (type_idx, unit_idx) = (proto.string_table.len(), proto.string_table.len() + 1);
-        proto.string_table.push("space".to_owned());
-        proto.string_table.push("bytes".to_owned());
+        proto.string_table.push("alloc_space".to_string());
+        proto.string_table.push("bytes".to_string());
+
         let sample_type = pprof::protos::ValueType {
             r#type: type_idx as i64,
             unit: unit_idx as i64,
         };
         proto.sample_type = vec![sample_type];
-        proto.string_table[type_idx] = "space".to_string();
-        proto.string_table[unit_idx] = "bytes".to_string();
 
         proto
     }
