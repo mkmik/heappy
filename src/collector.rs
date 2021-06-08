@@ -49,7 +49,13 @@ impl<K: Hash + Eq + 'static> Collector<K> {
         }
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (&K, &MemProfileRecord)> {
-        self.map.iter()
+    pub fn into_iter(self) -> impl Iterator<Item = (K, MemProfileRecord)> {
+        self.map.into_iter()
+    }
+}
+
+impl<K: Hash + Eq + 'static> Default for Collector<K> {
+    fn default() -> Self {
+        Self::new()
     }
 }

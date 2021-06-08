@@ -29,7 +29,7 @@ const MAX_DEPTH: usize = 32;
 static HEAP_PROFILER_ENABLED: AtomicBool = AtomicBool::new(false);
 
 lazy_static::lazy_static! {
-    static ref HEAP_PROFILER_STATE: RwLock<ProfilerState<MAX_DEPTH>> = RwLock::new(ProfilerState::new(1));
+    static ref HEAP_PROFILER_STATE: RwLock<ProfilerState<MAX_DEPTH>> = RwLock::new(Default::default());
 }
 
 /// RAII structure used to stop profiling when dropped. It is the only interface to access the heap profiler.
@@ -120,12 +120,13 @@ pub struct HeapReport {
 
 impl HeapReport {
     fn new() -> Self {
-        let profiler = HEAP_PROFILER_STATE.read();
+        let mut profiler = HEAP_PROFILER_STATE.write();
+        let collector = std::mem::take(&mut profiler.collector);
 
         let mut data: HashMap<pprof::Frames, isize> = HashMap::new();
 
-        for (frames, record) in profiler.collector.iter() {
-            data.insert(frames.clone().into(), record.alloc_bytes);
+        for (frames, record) in collector.into_iter() {
+            data.insert(frames.into(), record.alloc_bytes);
         }
         let report = pprof::Report { data };
         Self {
@@ -206,6 +207,12 @@ impl<const N: usize> ProfilerState<N> {
             allocated_bytes: 0,
             next_sample: period as isize,
         }
+    }
+}
+
+impl<const N: usize> Default for ProfilerState<N> {
+    fn default() -> Self {
+        Self::new(1)
     }
 }
 
