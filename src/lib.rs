@@ -95,6 +95,7 @@ impl Profiler {
 #[derive(Debug)]
 pub struct HeapReport {
     report: pprof::Report,
+    period: usize,
 }
 
 impl HeapReport {
@@ -107,7 +108,10 @@ impl HeapReport {
             data.insert(entry.item.clone().into(), entry.count);
         }
         let report = pprof::Report { data };
-        Self { report }
+        Self {
+            report,
+            period: profiler.period,
+        }
     }
 
     /// flamegraph will write an svg flamegraph into writer.
@@ -144,6 +148,14 @@ impl HeapReport {
         };
         proto.sample_type = vec![sample_type];
 
+        let period_type_idx = proto.string_table.len();
+        proto.string_table.push("space".to_string());
+        proto.period_type = Some(pprof::protos::ValueType {
+            r#type: period_type_idx as i64,
+            unit: unit_idx as i64,
+        });
+        proto.period = self.period as i64;
+
         let drop_frames_idx = proto.string_table.len();
         proto
             .string_table
@@ -157,12 +169,14 @@ impl HeapReport {
 // Current profiler state, collection of sampled frames.
 struct ProfilerState<const N: usize> {
     collector: pprof::Collector<Frames<N>>,
+    period: usize,
 }
 
 impl<const N: usize> ProfilerState<N> {
     fn new() -> Self {
         Self {
             collector: pprof::Collector::new().unwrap(),
+            period: 1,
         }
     }
 }
