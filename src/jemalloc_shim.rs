@@ -40,24 +40,27 @@ pub(crate) fn dummy_force_link() {}
 
 #[no_mangle]
 pub unsafe extern "C" fn malloc(size: size_t) -> *mut c_void {
-    Profiler::track_allocated(size);
+    Profiler::track_allocated(size as isize);
     sys_malloc(size)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn calloc(number: size_t, size: size_t) -> *mut c_void {
-    Profiler::track_allocated(size * number);
+    Profiler::track_allocated((size * number) as isize);
     sys_calloc(number, size)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn free(ptr: *mut c_void) {
+    let size = sys_malloc_usable_size(ptr) as isize;
+    Profiler::track_allocated(-size);
     sys_free(ptr)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn realloc(ptr: *mut c_void, size: size_t) -> *mut c_void {
-    Profiler::track_allocated(size);
+    let old_size = sys_malloc_usable_size(ptr) as isize;
+    Profiler::track_allocated(size as isize - old_size);
     sys_realloc(ptr, size)
 }
 
@@ -77,6 +80,6 @@ pub unsafe extern "C" fn posix_memalign(
 
 #[no_mangle]
 pub unsafe extern "C" fn aligned_alloc(alignment: size_t, size: size_t) -> *mut c_void {
-    Profiler::track_allocated(size); // TODO take alignment in account
+    Profiler::track_allocated(size as isize); // TODO take alignment in account
     sys_aligned_alloc(alignment, size)
 }

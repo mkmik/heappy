@@ -55,7 +55,7 @@ fn work() {
 }
 
 fn demo() {
-    let heap_profiler_guard = ruback::HeapProfilerGuard::new(100);
+    let heap_profiler_guard = ruback::HeapProfilerGuard::new(1);
 
     println!("start demo");
 

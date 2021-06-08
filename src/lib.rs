@@ -74,7 +74,7 @@ impl Profiler {
     }
 
     // Called by malloc hooks to record a memory allocation event.
-    pub(crate) unsafe fn track_allocated(size: usize) {
+    pub(crate) unsafe fn track_allocated(size: isize) {
         thread_local!(static ENTERED: Cell<bool> = Cell::new(false));
 
         struct ResetOnDrop;
@@ -88,16 +88,21 @@ impl Profiler {
         if !ENTERED.with(|b| b.replace(true)) {
             let _reset_on_drop = ResetOnDrop;
             if Self::enabled() {
+                // TODO: track deallocations
+                if size <= 0 {
+                    return;
+                }
+
                 let mut profiler = HEAP_PROFILER_STATE.write();
                 profiler.allocated_objects += 1;
                 profiler.allocated_bytes += size;
 
                 if profiler.allocated_bytes >= profiler.next_sample {
-                    profiler.next_sample = profiler.allocated_bytes + profiler.period;
+                    profiler.next_sample = profiler.allocated_bytes + profiler.period as isize;
                     let mut bt = Frames::new();
                     backtrace::trace(|frame| bt.push(frame));
 
-                    profiler.collector.add(bt, size as isize).unwrap();
+                    profiler.collector.add(bt, size).unwrap();
                 }
             }
         }
@@ -181,10 +186,10 @@ impl HeapReport {
 // Current profiler state, collection of sampled frames.
 struct ProfilerState<const N: usize> {
     collector: pprof::Collector<Frames<N>>,
-    allocated_objects: usize,
-    allocated_bytes: usize,
+    allocated_objects: isize,
+    allocated_bytes: isize,
     // take a sample when allocated crosses this threshold
-    next_sample: usize,
+    next_sample: isize,
     // take a sample every period bytes.
     period: usize,
 }
@@ -196,7 +201,7 @@ impl<const N: usize> ProfilerState<N> {
             period,
             allocated_objects: 0,
             allocated_bytes: 0,
-            next_sample: period,
+            next_sample: period as isize,
         }
     }
 }
