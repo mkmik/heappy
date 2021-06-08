@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
 use std::cell::Cell;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::io::Write;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -91,11 +91,6 @@ impl Profiler {
         if !ENTERED.with(|b| b.replace(true)) {
             let _reset_on_drop = ResetOnDrop;
             if Self::enabled() {
-                // TODO: track deallocations
-                if size <= 0 {
-                    return;
-                }
-
                 let mut profiler = HEAP_PROFILER_STATE.write();
                 profiler.allocated_objects += 1;
                 profiler.allocated_bytes += size;
@@ -143,7 +138,7 @@ impl HeapReport {
         let data = self
             .data
             .iter()
-            .map(|(frames, rec)| (frames.clone().into(), rec.alloc_bytes))
+            .map(|(frames, rec)| (frames.clone(), rec.alloc_bytes))
             .collect();
 
         let report = pprof::Report { data };
@@ -159,39 +154,141 @@ impl HeapReport {
             .unwrap();
     }
 
+    fn inner_pprof(&self) -> pprof::protos::Profile {
+        use pprof::protos;
+
+        let data = self.data.clone();
+
+        let mut dudup_str = HashSet::new();
+        for key in data.iter().map(|(key, _)| key) {
+            for frame in key.frames.iter() {
+                for symbol in frame {
+                    dudup_str.insert(symbol.name());
+                    dudup_str.insert(symbol.sys_name().into_owned());
+                    dudup_str.insert(symbol.filename().into_owned());
+                }
+            }
+        }
+        // string table's first element must be an empty string
+        let mut string_table = vec!["".to_owned()];
+        string_table.extend(dudup_str.into_iter());
+
+        let mut strings = HashMap::new();
+        for (index, name) in string_table.iter().enumerate() {
+            strings.insert(name.as_str(), index);
+        }
+
+        let mut samples = vec![];
+        let mut loc_tbl = vec![];
+        let mut fn_tbl = vec![];
+        let mut functions = HashMap::new();
+        for (key, rec) in data.iter() {
+            let mut locs = vec![];
+            for frame in key.frames.iter() {
+                for symbol in frame {
+                    let name = symbol.name();
+                    if let Some(loc_idx) = functions.get(&name) {
+                        locs.push(*loc_idx);
+                        continue;
+                    }
+                    let sys_name = symbol.sys_name();
+                    let filename = symbol.filename();
+                    let lineno = symbol.lineno();
+                    let function_id = fn_tbl.len() as u64 + 1;
+                    let function = protos::Function {
+                        id: function_id,
+                        name: *strings.get(name.as_str()).unwrap() as i64,
+                        system_name: *strings.get(sys_name.as_ref()).unwrap() as i64,
+                        filename: *strings.get(filename.as_ref()).unwrap() as i64,
+                        ..protos::Function::default()
+                    };
+                    functions.insert(name, function_id);
+                    let line = protos::Line {
+                        function_id,
+                        line: lineno as i64,
+                    };
+                    let loc = protos::Location {
+                        id: function_id,
+                        line: vec![line],
+                        ..protos::Location::default()
+                    };
+                    // the fn_tbl has the same length with loc_tbl
+                    fn_tbl.push(function);
+                    loc_tbl.push(loc);
+                    // current frame locations
+                    locs.push(function_id);
+                }
+            }
+            println!("SAMPLE: {:?}", rec);
+            let sample = protos::Sample {
+                location_id: locs,
+                value: vec![
+                    rec.alloc_objects as i64,
+                    rec.alloc_bytes as i64,
+                    rec.in_use_objects() as i64,
+                    rec.in_use_bytes() as i64,
+                ],
+                ..protos::Sample::default()
+            };
+            samples.push(sample);
+        }
+
+        let mut push_string = |s: &str| {
+            let idx = string_table.len();
+            string_table.push(s.to_string());
+            idx as i64
+        };
+
+        let alloc_objects_idx = push_string("alloc_objects");
+        let count_idx = push_string("count");
+        let alloc_space_idx = push_string("alloc_space");
+        let bytes_idx = push_string("bytes");
+        let inuse_objects_idx = push_string("inuse_objects");
+        let inuse_space_idx = push_string("inuse_space");
+        let space_idx = push_string("space");
+
+        let sample_type = vec![
+            protos::ValueType {
+                r#type: alloc_objects_idx,
+                unit: count_idx,
+            },
+            protos::ValueType {
+                r#type: alloc_space_idx,
+                unit: bytes_idx,
+            },
+            protos::ValueType {
+                r#type: inuse_objects_idx,
+                unit: count_idx,
+            },
+            protos::ValueType {
+                r#type: inuse_space_idx,
+                unit: bytes_idx,
+            },
+        ];
+
+        let period_type = Some(pprof::protos::ValueType {
+            r#type: space_idx,
+            unit: bytes_idx,
+        });
+
+        let profile = protos::Profile {
+            sample_type,
+            default_sample_type: 3,
+            sample: samples,
+            string_table,
+            period_type,
+            period: self.period as i64,
+            function: fn_tbl,
+            location: loc_tbl,
+            ..protos::Profile::default()
+        };
+
+        profile
+    }
+
     /// produce a pprof proto (for use with go tool pprof and compatible visualizers)
     pub fn pprof(&self) -> pprof::protos::Profile {
-        let data = self
-            .data
-            .iter()
-            .map(|(frames, rec)| (frames.clone().into(), rec.alloc_bytes))
-            .collect();
-
-        let report = pprof::Report { data };
-
-        // The pprof crate currently only supports sampling cpu.
-        // But other than that it does exactly the work we need, so instead of
-        // duplicating the pprof proto generation code here, we're just fixing up the "legend".
-        // There is work underway to add this natively to pprof-rs https://github.com/tikv/pprof-rs/pull/45
-        let mut proto = report.pprof().unwrap();
-
-        let (type_idx, unit_idx) = (proto.string_table.len(), proto.string_table.len() + 1);
-        proto.string_table.push("alloc_space".to_string());
-        proto.string_table.push("bytes".to_string());
-
-        let sample_type = pprof::protos::ValueType {
-            r#type: type_idx as i64,
-            unit: unit_idx as i64,
-        };
-        proto.sample_type = vec![sample_type];
-
-        let period_type_idx = proto.string_table.len();
-        proto.string_table.push("space".to_string());
-        proto.period_type = Some(pprof::protos::ValueType {
-            r#type: period_type_idx as i64,
-            unit: unit_idx as i64,
-        });
-        proto.period = self.period as i64;
+        let mut proto = self.inner_pprof();
 
         let drop_frames_idx = proto.string_table.len();
         proto
