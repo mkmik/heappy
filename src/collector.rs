@@ -3,7 +3,7 @@ use core::default::Default;
 use core::hash::Hash;
 use std::collections::HashMap;
 
-#[derive(Default)]
+#[derive(Default, Debug, Clone)]
 pub struct MemProfileRecord {
     pub alloc_bytes: isize,
     pub free_bytes: isize,
@@ -22,7 +22,7 @@ impl MemProfileRecord {
 }
 
 pub struct Collector<K: Hash + Eq + 'static> {
-    map: HashMap<K, MemProfileRecord>,
+    pub map: HashMap<K, MemProfileRecord>,
 }
 
 impl<K: Hash + Eq + 'static> Collector<K> {

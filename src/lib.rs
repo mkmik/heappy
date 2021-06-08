@@ -114,7 +114,7 @@ impl Profiler {
 
 #[derive(Debug)]
 pub struct HeapReport {
-    report: pprof::Report,
+    data: HashMap<pprof::Frames, collector::MemProfileRecord>,
     period: usize,
 }
 
@@ -123,14 +123,12 @@ impl HeapReport {
         let mut profiler = HEAP_PROFILER_STATE.write();
         let collector = std::mem::take(&mut profiler.collector);
 
-        let mut data: HashMap<pprof::Frames, isize> = HashMap::new();
-
-        for (frames, record) in collector.into_iter() {
-            data.insert(frames.into(), record.alloc_bytes);
-        }
-        let report = pprof::Report { data };
+        let data = collector
+            .into_iter()
+            .map(|(frames, rec)| (frames.into(), rec))
+            .collect();
         Self {
-            report,
+            data,
             period: profiler.period,
         }
     }
@@ -140,24 +138,42 @@ impl HeapReport {
     where
         W: Write,
     {
+        // the pprof crate already has all the necessary plumbing for the embedded flamegraph library, let's just render
+        // the alloc_bytes stat with it.
+        let data = self
+            .data
+            .iter()
+            .map(|(frames, rec)| (frames.clone().into(), rec.alloc_bytes))
+            .collect();
+
+        let report = pprof::Report { data };
+
         let mut options: pprof::flamegraph::Options = Default::default();
 
         options.count_name = "bytes".to_string();
         options.colors =
             pprof::flamegraph::color::Palette::Basic(pprof::flamegraph::color::BasicPalette::Mem);
 
-        self.report
+        report
             .flamegraph_with_options(writer, &mut options)
             .unwrap();
     }
 
     /// produce a pprof proto (for use with go tool pprof and compatible visualizers)
     pub fn pprof(&self) -> pprof::protos::Profile {
+        let data = self
+            .data
+            .iter()
+            .map(|(frames, rec)| (frames.clone().into(), rec.alloc_bytes))
+            .collect();
+
+        let report = pprof::Report { data };
+
         // The pprof crate currently only supports sampling cpu.
         // But other than that it does exactly the work we need, so instead of
         // duplicating the pprof proto generation code here, we're just fixing up the "legend".
         // There is work underway to add this natively to pprof-rs https://github.com/tikv/pprof-rs/pull/45
-        let mut proto = self.report.pprof().unwrap();
+        let mut proto = report.pprof().unwrap();
 
         let (type_idx, unit_idx) = (proto.string_table.len(), proto.string_table.len() + 1);
         proto.string_table.push("alloc_space".to_string());
