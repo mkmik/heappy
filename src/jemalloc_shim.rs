@@ -26,9 +26,17 @@ extern "C" {
     #[link_name = "_rjem_posix_memalign"]
     pub fn sys_posix_memalign(ptr: *mut *mut c_void, alignment: size_t, size: size_t) -> c_int;
 
+    #[cfg(target_os = "macos")]
     #[link_name = "_rjem_posix_aligned_alloc"]
     pub fn sys_aligned_alloc(alignment: size_t, size: size_t) -> *mut c_void;
+
+    #[cfg(not(target_os = "macos"))]
+    #[link_name = "_rjem_aligned_alloc"]
+    pub fn sys_aligned_alloc(alignment: size_t, size: size_t) -> *mut c_void;
 }
+
+// On linux we need to reference at least one symbol in a module for it to not be pruned at link time.
+pub(crate) fn dummy_force_link() {}
 
 #[no_mangle]
 pub unsafe extern "C" fn malloc(size: size_t) -> *mut c_void {

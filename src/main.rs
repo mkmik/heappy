@@ -68,6 +68,7 @@ fn demo() {
 
     let mut buf = vec![];
     proto.encode(&mut buf).unwrap();
+    println!("proto size: {}", buf.len());
     let filename = "/tmp/memflame.pb";
     println!("Writing to {}", filename);
     let mut file = std::fs::File::create(filename).unwrap();
