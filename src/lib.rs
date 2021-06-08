@@ -89,10 +89,11 @@ impl Profiler {
             let _reset_on_drop = ResetOnDrop;
             if Self::enabled() {
                 let mut profiler = HEAP_PROFILER_STATE.write();
-                profiler.allocated += size;
+                profiler.allocated_objects += 1;
+                profiler.allocated_bytes += size;
 
-                if profiler.allocated >= profiler.next_sample {
-                    profiler.next_sample = profiler.allocated + profiler.period;
+                if profiler.allocated_bytes >= profiler.next_sample {
+                    profiler.next_sample = profiler.allocated_bytes + profiler.period;
                     let mut bt = Frames::new();
                     backtrace::trace(|frame| bt.push(frame));
 
@@ -180,8 +181,8 @@ impl HeapReport {
 // Current profiler state, collection of sampled frames.
 struct ProfilerState<const N: usize> {
     collector: pprof::Collector<Frames<N>>,
-    // track total allocated bytes
-    allocated: usize,
+    allocated_objects: usize,
+    allocated_bytes: usize,
     // take a sample when allocated crosses this threshold
     next_sample: usize,
     // take a sample every period bytes.
@@ -193,7 +194,8 @@ impl<const N: usize> ProfilerState<N> {
         Self {
             collector: pprof::Collector::new().unwrap(),
             period,
-            allocated: 0,
+            allocated_objects: 0,
+            allocated_bytes: 0,
             next_sample: period,
         }
     }
