@@ -1,12 +1,15 @@
 #![allow(dead_code)]
 
-use backtrace::Frame;
-use spin::RwLock;
 use std::cell::Cell;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::io::Write;
 use std::sync::atomic::{AtomicBool, Ordering};
+
+use backtrace::Frame;
+use spin::RwLock;
+
+mod collector;
 
 #[cfg(feature = "jemalloc_shim")]
 mod jemalloc_shim;
@@ -121,7 +124,7 @@ impl HeapReport {
 
         let mut data: HashMap<pprof::Frames, isize> = HashMap::new();
 
-        for (frames, record) in profiler.collector.map.iter() {
+        for (frames, record) in profiler.collector.iter() {
             data.insert(frames.clone().into(), record.alloc_bytes);
         }
         let report = pprof::Report { data };
@@ -185,7 +188,7 @@ impl HeapReport {
 
 // Current profiler state, collection of sampled frames.
 struct ProfilerState<const N: usize> {
-    collector: Collector<Frames<N>>,
+    collector: collector::Collector<Frames<N>>,
     allocated_objects: isize,
     allocated_bytes: isize,
     // take a sample when allocated crosses this threshold
@@ -197,7 +200,7 @@ struct ProfilerState<const N: usize> {
 impl<const N: usize> ProfilerState<N> {
     fn new(period: usize) -> Self {
         Self {
-            collector: Collector::new(),
+            collector: collector::Collector::new(),
             period,
             allocated_objects: 0,
             allocated_bytes: 0,
@@ -298,52 +301,6 @@ impl<const N: usize> From<Frames<N>> for pprof::Frames {
             frames,
             thread_name: "".to_string(),
             thread_id: 0,
-        }
-    }
-}
-
-#[derive(Default)]
-struct MemProfileRecord {
-    alloc_bytes: isize,
-    free_bytes: isize,
-    alloc_objects: isize,
-    free_objects: isize,
-}
-
-impl MemProfileRecord {
-    fn in_use_bytes(&self) -> isize {
-        self.alloc_bytes - self.free_bytes
-    }
-    fn in_use_objects(&self) -> isize {
-        self.alloc_objects - self.free_objects
-    }
-}
-
-struct Collector<K: Hash + Eq + 'static> {
-    map: HashMap<K, MemProfileRecord>,
-}
-
-impl<K: Hash + Eq + 'static> Collector<K> {
-    fn new() -> Self {
-        Self {
-            map: HashMap::new(),
-        }
-    }
-
-    fn record(&mut self, key: K, bytes: isize) {
-        let rec = self.map.entry(key).or_insert_with(Default::default);
-        match bytes.cmp(&0) {
-            std::cmp::Ordering::Greater => {
-                rec.alloc_bytes += bytes;
-                rec.alloc_objects += 1;
-            }
-            std::cmp::Ordering::Less => {
-                rec.free_bytes += -bytes;
-                rec.free_objects += 1;
-            }
-            std::cmp::Ordering::Equal => {
-                // ignore
-            }
         }
     }
 }
