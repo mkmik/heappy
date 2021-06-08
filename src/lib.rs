@@ -144,6 +144,12 @@ impl HeapReport {
         };
         proto.sample_type = vec![sample_type];
 
+        let drop_frames_idx = proto.string_table.len();
+        proto
+            .string_table
+            .push(".*::Profiler::track_allocated".to_string());
+        proto.drop_frames = drop_frames_idx as i64;
+
         proto
     }
 }
@@ -235,21 +241,14 @@ impl<const N: usize> From<Frames<N>> for pprof::Frames {
         let frames = bt
             .iter()
             .map(|frame| {
-                let mut symbols: Vec<pprof::Symbol> = Vec::new();
+                let mut symbols = Vec::new();
                 backtrace::resolve_frame(frame, |symbol| {
                     if let Some(name) = symbol.name() {
                         let name = format!("{:#}", name);
-                        if !name.starts_with("backtrace::")
-                            && !name.ends_with("::track_allocated")
-                            && !name.starts_with("alloc::alloc::")
+                        if !name.starts_with("alloc::alloc::")
                             && name != "<alloc::alloc::Global as core::alloc::Allocator>::allocate"
                         {
-                            symbols.push(pprof::Symbol {
-                                name: Some(name.as_bytes().to_vec()),
-                                addr: None,
-                                lineno: None,
-                                filename: None,
-                            })
+                            symbols.push(symbol.into());
                         }
                     }
                 });
