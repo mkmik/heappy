@@ -26,15 +26,15 @@ const MAX_DEPTH: usize = 32;
 static HEAP_PROFILER_ENABLED: AtomicBool = AtomicBool::new(false);
 
 lazy_static::lazy_static! {
-    static ref HEAP_PROFILER_STATE: RwLock<ProfilerState<MAX_DEPTH>> = RwLock::new(ProfilerState::new());
+    static ref HEAP_PROFILER_STATE: RwLock<ProfilerState<MAX_DEPTH>> = RwLock::new(ProfilerState::new(1));
 }
 
 /// RAII structure used to stop profiling when dropped. It is the only interface to access the heap profiler.
 pub struct HeapProfilerGuard {}
 
 impl HeapProfilerGuard {
-    pub fn new() -> Self {
-        Profiler::set_enabled(true);
+    pub fn new(period: usize) -> Self {
+        Profiler::start(period);
         Self {}
     }
 
@@ -44,15 +44,9 @@ impl HeapProfilerGuard {
     }
 }
 
-impl Default for HeapProfilerGuard {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl Drop for HeapProfilerGuard {
     fn drop(&mut self) {
-        Profiler::set_enabled(false);
+        Profiler::stop();
     }
 }
 
@@ -65,6 +59,18 @@ impl Profiler {
 
     fn set_enabled(value: bool) {
         HEAP_PROFILER_ENABLED.store(value, Ordering::SeqCst)
+    }
+
+    fn start(period: usize) {
+        let mut profiler = HEAP_PROFILER_STATE.write();
+        *profiler = ProfilerState::new(period);
+        std::mem::drop(profiler);
+
+        Self::set_enabled(true);
+    }
+
+    fn stop() {
+        Self::set_enabled(false);
     }
 
     // Called by malloc hooks to record a memory allocation event.
@@ -82,11 +88,16 @@ impl Profiler {
         if !ENTERED.with(|b| b.replace(true)) {
             let _reset_on_drop = ResetOnDrop;
             if Self::enabled() {
-                let mut bt = Frames::new();
-                backtrace::trace(|frame| bt.push(frame));
-
                 let mut profiler = HEAP_PROFILER_STATE.write();
-                profiler.collector.add(bt, size as isize).unwrap();
+                profiler.allocated += size;
+
+                if profiler.allocated >= profiler.next_sample {
+                    profiler.next_sample = profiler.allocated + profiler.period;
+                    let mut bt = Frames::new();
+                    backtrace::trace(|frame| bt.push(frame));
+
+                    profiler.collector.add(bt, size as isize).unwrap();
+                }
             }
         }
     }
@@ -169,14 +180,21 @@ impl HeapReport {
 // Current profiler state, collection of sampled frames.
 struct ProfilerState<const N: usize> {
     collector: pprof::Collector<Frames<N>>,
+    // track total allocated bytes
+    allocated: usize,
+    // take a sample when allocated crosses this threshold
+    next_sample: usize,
+    // take a sample every period bytes.
     period: usize,
 }
 
 impl<const N: usize> ProfilerState<N> {
-    fn new() -> Self {
+    fn new(period: usize) -> Self {
         Self {
             collector: pprof::Collector::new().unwrap(),
-            period: 1,
+            period,
+            allocated: 0,
+            next_sample: period,
         }
     }
 }
