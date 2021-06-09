@@ -13,6 +13,8 @@ debug = true
 default = []
 jemalloc_shim = []
 enable_heap_profiler = ["jemalloc_shim"]
+# use pprof::Collector instead of our custom collector
+pprof_collector = []
 
 [dependencies]
 backtrace = "0.3.59"

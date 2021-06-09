@@ -1,6 +1,7 @@
 use core::cmp::Eq;
 use core::default::Default;
 use core::hash::Hash;
+#[cfg(not(feature = "pprof_collector"))]
 use std::collections::HashMap;
 
 #[derive(Default, Debug, Clone)]
@@ -21,11 +22,13 @@ impl MemProfileRecord {
     }
 }
 
-pub struct Collector<K: Hash + Eq + 'static> {
-    pub map: HashMap<K, MemProfileRecord>,
+#[cfg(not(feature = "pprof_collector"))]
+pub struct Collector<K: Hash + Eq + Clone + 'static> {
+    map: HashMap<K, MemProfileRecord>,
 }
 
-impl<K: Hash + Eq + 'static> Collector<K> {
+#[cfg(not(feature = "pprof_collector"))]
+impl<K: Hash + Clone + Eq + 'static> Collector<K> {
     pub fn new() -> Self {
         Self {
             map: HashMap::new(),
@@ -54,8 +57,45 @@ impl<K: Hash + Eq + 'static> Collector<K> {
     }
 }
 
-impl<K: Hash + Eq + 'static> Default for Collector<K> {
+impl<K: Hash + Eq + Clone + 'static> Default for Collector<K> {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(feature = "pprof_collector")]
+pub struct Collector<K: Hash + Eq + 'static> {
+    collector: pprof::Collector<K>,
+}
+
+#[cfg(feature = "pprof_collector")]
+impl<K: Hash + Eq + Clone + 'static> Collector<K> {
+    pub fn new() -> Self {
+        Self {
+            collector: pprof::Collector::new().unwrap(),
+        }
+    }
+
+    pub fn record(&mut self, key: K, bytes: isize) {
+        self.collector.add(key, bytes).unwrap();
+    }
+
+    pub fn into_iter(self) -> impl Iterator<Item = (K, MemProfileRecord)> + 'static {
+        let res: Vec<_> = self
+            .collector
+            .try_iter()
+            .unwrap()
+            .into_iter()
+            .map(|entry| {
+                (
+                    entry.item.clone(),
+                    MemProfileRecord {
+                        alloc_bytes: entry.count,
+                        ..Default::default()
+                    },
+                )
+            })
+            .collect();
+        res.into_iter()
     }
 }
