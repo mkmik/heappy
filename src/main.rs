@@ -1,6 +1,10 @@
 use croaring::Bitmap;
 use pprof::protos::Message;
 use std::io::Write;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::{thread, time};
+
+static ITERATIONS: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Debug)]
 struct Foo {
@@ -22,7 +26,7 @@ impl Foo {
     }
 
     fn foo(&self) {
-        println!("{:?}", self.v.iter().fold(0u8, |a, b| a.wrapping_add(*b)));
+        //  println!("{:?}", self.v.iter().fold(0u8, |a, b| a.wrapping_add(*b)));
     }
 }
 
@@ -41,9 +45,13 @@ fn work() {
     rb1.add(5);
     rb1.add(100);
     rb1.add(1000);
-    println!("optimizing");
     rb1.run_optimize();
-    println!("done");
+
+    for i in (2000..(100 * 1024 * 1024)).step_by(64 * 1024 + 1) {
+        rb1.add(i);
+    }
+    rb1.run_optimize();
+
     assert!(rb1.contains(3));
 
     // loop {
@@ -56,14 +64,24 @@ fn work() {
     std::mem::forget(m);
 }
 
+fn worker() {
+    loop {
+        work();
+        ITERATIONS.fetch_add(1, Ordering::Relaxed);
+    }
+}
+
 fn demo() {
     let heap_profiler_guard = ruback::HeapProfilerGuard::new(1);
 
     println!("start demo");
 
-    for _ in 0..1000 {
-        work();
+    for _ in 0..4 {
+        thread::spawn(worker);
     }
+    thread::sleep(time::Duration::from_secs(4));
+    let iterations = ITERATIONS.fetch_add(0, Ordering::SeqCst);
+    println!("Iterations: {}", iterations);
 
     let report = heap_profiler_guard.report();
 

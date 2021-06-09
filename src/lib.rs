@@ -300,7 +300,7 @@ impl HeapReport {
 
         let profile = protos::Profile {
             sample_type,
-            default_sample_type: 3,
+            default_sample_type: alloc_space_idx,
             sample: samples,
             string_table,
             period_type,
