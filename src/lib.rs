@@ -121,7 +121,8 @@ impl Profiler {
 
                 if sample_now {
                     let mut bt = Frames::new();
-                    backtrace::trace(|frame| bt.push(frame));
+                    // we're already holding a lock
+                    backtrace::trace_unsynchronized(|frame| bt.push(frame));
 
                     profiler.collector.record(bt, size);
                 }
