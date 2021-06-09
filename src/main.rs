@@ -48,10 +48,12 @@ fn work() {
 
     // loop {
     let v = vec![1, 2, 3, 4];
-    let m: Vec<Foo> = v.into_iter().map(Foo::new).collect();
+    let mut m: Vec<Foo> = v.into_iter().map(Foo::new).collect();
 
     foo(&m);
     //}
+    m.remove(0);
+    std::mem::forget(m);
 }
 
 fn demo() {

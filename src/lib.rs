@@ -92,11 +92,34 @@ impl Profiler {
             let _reset_on_drop = ResetOnDrop;
             if Self::enabled() {
                 let mut profiler = HEAP_PROFILER_STATE.write();
-                profiler.allocated_objects += 1;
-                profiler.allocated_bytes += size;
+                let mut sample_now = false;
+                match size.cmp(&0) {
+                    std::cmp::Ordering::Greater => {
+                        profiler.allocated_objects += 1;
+                        profiler.allocated_bytes += size;
 
-                if profiler.allocated_bytes >= profiler.next_sample {
-                    profiler.next_sample = profiler.allocated_bytes + profiler.period as isize;
+                        if profiler.allocated_bytes >= profiler.next_sample {
+                            profiler.next_sample =
+                                profiler.allocated_bytes + profiler.period as isize;
+                            sample_now = true;
+                        }
+                    }
+                    std::cmp::Ordering::Less => {
+                        profiler.freed_objects += 1;
+                        profiler.freed_bytes += -size;
+
+                        if profiler.freed_bytes >= profiler.next_free_sample {
+                            profiler.next_free_sample =
+                                profiler.freed_bytes + profiler.period as isize;
+                            sample_now = true;
+                        }
+                    }
+                    std::cmp::Ordering::Equal => {
+                        // ignore
+                    }
+                }
+
+                if sample_now {
                     let mut bt = Frames::new();
                     backtrace::trace(|frame| bt.push(frame));
 
@@ -122,6 +145,8 @@ impl HeapReport {
             .into_iter()
             .map(|(frames, rec)| (frames.into(), rec))
             .collect();
+        let (a, b) = (profiler.allocated_bytes, profiler.freed_bytes);
+        println!("STATS {:?} - {:?} = {:?}", a, b, a - b);
         Self {
             data,
             period: profiler.period,
@@ -156,7 +181,10 @@ impl HeapReport {
 
     fn inner_pprof(&self) -> pprof::protos::Profile {
         use pprof::protos;
-
+        for (_, rec) in self.data.iter() {
+            println!("REC: {:?}", rec);
+        }
+        println!("XXXX");
         let data = self.data.clone();
 
         let mut dudup_str = HashSet::new();
@@ -219,7 +247,6 @@ impl HeapReport {
                     locs.push(function_id);
                 }
             }
-            println!("SAMPLE: {:?}", rec);
             let sample = protos::Sample {
                 location_id: locs,
                 value: vec![
@@ -305,8 +332,12 @@ struct ProfilerState<const N: usize> {
     collector: collector::Collector<Frames<N>>,
     allocated_objects: isize,
     allocated_bytes: isize,
+    freed_objects: isize,
+    freed_bytes: isize,
     // take a sample when allocated crosses this threshold
     next_sample: isize,
+    // take a sample when free crosses this threshold
+    next_free_sample: isize,
     // take a sample every period bytes.
     period: usize,
 }
@@ -318,7 +349,10 @@ impl<const N: usize> ProfilerState<N> {
             period,
             allocated_objects: 0,
             allocated_bytes: 0,
+            freed_objects: 0,
+            freed_bytes: 0,
             next_sample: period as isize,
+            next_free_sample: period as isize,
         }
     }
 }
