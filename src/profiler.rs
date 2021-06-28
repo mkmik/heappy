@@ -132,8 +132,6 @@ impl HeapReport {
             .into_iter()
             .map(|(frames, rec)| (frames.into(), rec))
             .collect();
-        let (a, b) = (profiler.allocated_bytes, profiler.freed_bytes);
-        println!("STATS {:?} - {:?} = {:?}", a, b, a - b);
         Self {
             data,
             period: profiler.period,
@@ -168,10 +166,6 @@ impl HeapReport {
 
     fn inner_pprof(&self) -> pprof::protos::Profile {
         use pprof::protos;
-        for (_, rec) in self.data.iter() {
-            println!("REC: {:?}", rec);
-        }
-        println!("XXXX");
         let data = self.data.clone();
 
         let mut dudup_str = HashSet::new();
