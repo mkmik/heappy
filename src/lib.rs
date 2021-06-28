@@ -299,7 +299,7 @@ impl HeapReport {
             unit: bytes_idx,
         });
 
-        let profile = protos::Profile {
+        protos::Profile {
             sample_type,
             default_sample_type: alloc_space_idx,
             sample: samples,
@@ -309,9 +309,7 @@ impl HeapReport {
             function: fn_tbl,
             location: loc_tbl,
             ..protos::Profile::default()
-        };
-
-        profile
+        }
     }
 
     /// produce a pprof proto (for use with go tool pprof and compatible visualizers)
