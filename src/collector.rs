@@ -48,8 +48,13 @@ impl<K: Hash + Eq + 'static> Collector<K> {
             }
         }
     }
+}
 
-    pub fn into_iter(self) -> impl Iterator<Item = (K, MemProfileRecord)> {
+impl<K: Hash + Eq + 'static> IntoIterator for Collector<K> {
+    type Item = (K, MemProfileRecord);
+    type IntoIter = std::collections::hash_map::IntoIter<K, MemProfileRecord>;
+
+    fn into_iter(self) -> Self::IntoIter {
         self.map.into_iter()
     }
 }
