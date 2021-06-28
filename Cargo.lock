@@ -191,7 +191,6 @@ version = "0.1.0"
 dependencies = [
  "croaring",
  "heappy",
- "pprof",
  "prost",
 ]
 

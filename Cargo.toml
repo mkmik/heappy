@@ -15,7 +15,7 @@ debug = true
 
 [features]
 default = []
-jemalloc_shim = []
+jemalloc_shim = [ "tikv-jemalloc-sys" ]
 enable_heap_profiler = [ "jemalloc_shim" ]
 
 [dependencies]
@@ -25,4 +25,4 @@ lazy_static = "1.4.0"
 libc = { version = "^0.2.8", default-features = false }
 pprof = {version = "0.4.3", features = [ "flamegraph", "protobuf" ] }
 spin = "0.9.0"
-tikv-jemalloc-sys = { version = "0.4", features = [ "stats" ] }
+tikv-jemalloc-sys = { version = "0.4", optional = true, features = [ "stats" ] }

@@ -1,5 +1,5 @@
 use croaring::Bitmap;
-use pprof::protos::Message;
+use prost::Message;
 use std::io::Write;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::{thread, time};
