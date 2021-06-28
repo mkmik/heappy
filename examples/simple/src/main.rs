@@ -1,5 +1,6 @@
-use prost::Message;
 use std::io::Write;
+
+use prost::Message;
 
 fn work() {
     let v = vec![65_u8, 66, 66, 10];

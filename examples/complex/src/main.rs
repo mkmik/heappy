@@ -1,8 +1,9 @@
-use croaring::Bitmap;
-use prost::Message;
 use std::io::Write;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::{thread, time};
+
+use croaring::Bitmap;
+use prost::Message;
 
 static ITERATIONS: AtomicU64 = AtomicU64::new(0);
 
