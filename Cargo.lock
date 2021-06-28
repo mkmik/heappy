@@ -287,6 +287,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d7afe4a420e3fe79967a00898cc1f4db7c8a49a9333a29f8a4bd76a253d5cd04"
 
 [[package]]
+name = "heappy"
+version = "0.1.0"
+dependencies = [
+ "backtrace",
+ "bytes",
+ "croaring",
+ "lazy_static",
+ "libc",
+ "pprof",
+ "spin",
+ "tikv-jemallocator",
+]
+
+[[package]]
 name = "heck"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -718,20 +732,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8fddb3b23626145d1776addfc307e1a1851f60ef6ca64f376bcb889697144cf0"
 dependencies = [
  "bytemuck",
-]
-
-[[package]]
-name = "ruback"
-version = "0.1.0"
-dependencies = [
- "backtrace",
- "bytes",
- "croaring",
- "lazy_static",
- "libc",
- "pprof",
- "spin",
- "tikv-jemallocator",
 ]
 
 [[package]]
