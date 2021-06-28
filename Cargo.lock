@@ -304,6 +304,7 @@ dependencies = [
  "lazy_static",
  "libc",
  "pprof",
+ "prost",
  "spin",
  "tikv-jemalloc-sys",
 ]

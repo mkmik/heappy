@@ -5,6 +5,7 @@ use std::io::Write;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use backtrace::Frame;
+use prost::Message;
 use spin::RwLock;
 
 use crate::collector;
@@ -308,6 +309,12 @@ impl HeapReport {
         proto.drop_frames = drop_frames_idx as i64;
 
         proto
+    }
+
+    pub fn write_pprof<W: Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        let mut buf = vec![];
+        self.pprof().encode(&mut buf)?;
+        writer.write_all(&buf)
     }
 }
 
