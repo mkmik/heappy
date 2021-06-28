@@ -3,7 +3,7 @@
 //! [`posix_memalign`] which conforms to conforms to POSIX.1-2016, and
 //! [`aligned_alloc`].
 
-use super::Profiler;
+use crate::profiler::Profiler;
 use libc::{c_int, c_void, size_t};
 
 #[link(name = "jemalloc")]
