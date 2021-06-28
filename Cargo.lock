@@ -302,12 +302,11 @@ version = "0.1.0"
 dependencies = [
  "backtrace",
  "bytes",
- "croaring",
  "lazy_static",
  "libc",
  "pprof",
  "spin",
- "tikv-jemallocator",
+ "tikv-jemalloc-sys",
 ]
 
 [[package]]
@@ -904,16 +903,6 @@ dependencies = [
  "cc",
  "fs_extra",
  "libc",
-]
-
-[[package]]
-name = "tikv-jemallocator"
-version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3c14a5a604eb8715bc5785018a37d00739b180bcf609916ddf4393d33d49ccdf"
-dependencies = [
- "libc",
- "tikv-jemalloc-sys",
 ]
 
 [[package]]

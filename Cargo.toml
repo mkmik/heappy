@@ -1,7 +1,7 @@
 [package]
 name = "heappy"
 version = "0.1.0"
-authors = ["Marko Mikulicic <mmikulicic@gmail.com>"]
+authors = [ "Marko Mikulicic <mkm@influxdata.com>" ]
 edition = "2018"
 
 [workspace]
@@ -16,20 +16,13 @@ debug = true
 [features]
 default = []
 jemalloc_shim = []
-enable_heap_profiler = ["jemalloc_shim"]
+enable_heap_profiler = [ "jemalloc_shim" ]
 
 [dependencies]
 backtrace = "0.3.59"
-croaring = "0.5.0"
-libc = { version = "^0.2.8", default-features = false }
-tikv-jemallocator = {version = "0.4.0"}
-lazy_static = "1.4.0"
-pprof = {version = "0.4.3", features = ["flamegraph", "protobuf"] }
-spin = "0.9.0"
 bytes = "1.0.1"
-
-# tikv-jemallocator = {version = "0.4.0", features = ["unprefixed_malloc_on_supported_platforms"] }
-# tikv-jemalloc-sys = { version = "0.4", features = ["stats"] }
-
-# deepsize = "0.2.0"
-# heapsize = "0.4.2"
+lazy_static = "1.4.0"
+libc = { version = "^0.2.8", default-features = false }
+pprof = {version = "0.4.3", features = [ "flamegraph", "protobuf" ] }
+spin = "0.9.0"
+tikv-jemalloc-sys = { version = "0.4", features = [ "stats" ] }
