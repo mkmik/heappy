@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use std::cell::Cell;
 use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
