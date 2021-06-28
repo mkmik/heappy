@@ -17,6 +17,7 @@ debug = true
 default = []
 jemalloc_shim = [ "tikv-jemalloc-sys" ]
 enable_heap_profiler = [ "jemalloc_shim" ]
+measure_free = []
 
 [dependencies]
 backtrace = "0.3.59"

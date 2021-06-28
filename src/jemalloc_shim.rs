@@ -52,8 +52,11 @@ pub unsafe extern "C" fn calloc(number: size_t, size: size_t) -> *mut c_void {
 
 #[no_mangle]
 pub unsafe extern "C" fn free(ptr: *mut c_void) {
-    let size = sys_malloc_usable_size(ptr) as isize;
-    Profiler::track_allocated(-size);
+    #[cfg(feature = "measure_free")]
+    {
+        let size = sys_malloc_usable_size(ptr) as isize;
+        Profiler::track_allocated(-size);
+    }
     sys_free(ptr)
 }
 

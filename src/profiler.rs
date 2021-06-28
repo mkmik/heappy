@@ -230,12 +230,15 @@ impl HeapReport {
             }
             let sample = protos::Sample {
                 location_id: locs,
+                #[cfg(feature = "measure_free")]
                 value: vec![
                     rec.alloc_objects as i64,
                     rec.alloc_bytes as i64,
                     rec.in_use_objects() as i64,
                     rec.in_use_bytes() as i64,
                 ],
+                #[cfg(not(feature = "measure_free"))]
+                value: vec![rec.alloc_objects as i64, rec.alloc_bytes as i64],
                 ..protos::Sample::default()
             };
             samples.push(sample);

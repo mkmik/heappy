@@ -6,11 +6,14 @@ use std::collections::HashMap;
 #[derive(Default, Debug, Clone)]
 pub struct MemProfileRecord {
     pub alloc_bytes: isize,
-    pub free_bytes: isize,
     pub alloc_objects: isize,
+    #[cfg(feature = "measure_free")]
+    pub free_bytes: isize,
+    #[cfg(feature = "measure_free")]
     pub free_objects: isize,
 }
 
+#[cfg(feature = "measure_free")]
 impl MemProfileRecord {
     pub fn in_use_bytes(&self) -> isize {
         self.alloc_bytes - self.free_bytes
@@ -39,9 +42,14 @@ impl<K: Hash + Eq + 'static> Collector<K> {
                 rec.alloc_bytes += bytes;
                 rec.alloc_objects += 1;
             }
+            #[cfg(feature = "measure_free")]
             std::cmp::Ordering::Less => {
                 rec.free_bytes += -bytes;
                 rec.free_objects += 1;
+            }
+            #[cfg(not(feature = "measure_free"))]
+            std::cmp::Ordering::Less => {
+                unreachable!("the measure_free feature flag is disabled yet I've measured a free")
             }
             std::cmp::Ordering::Equal => {
                 // ignore
