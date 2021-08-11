@@ -90,6 +90,11 @@ impl Profiler {
                             sample_now = true;
                         }
                     }
+                    #[cfg(not(feature = "measure_free"))]
+                    std::cmp::Ordering::Less => {
+                        // ignore
+                    }
+                    #[cfg(feature = "measure_free")]
                     std::cmp::Ordering::Less => {
                         profiler.freed_objects += 1;
                         profiler.freed_bytes += -size;
@@ -254,7 +259,9 @@ impl HeapReport {
         let count_idx = push_string("count");
         let alloc_space_idx = push_string("alloc_space");
         let bytes_idx = push_string("bytes");
+        #[cfg(feature = "measure_free")]
         let inuse_objects_idx = push_string("inuse_objects");
+        #[cfg(feature = "measure_free")]
         let inuse_space_idx = push_string("inuse_space");
         let space_idx = push_string("space");
 
@@ -267,10 +274,12 @@ impl HeapReport {
                 r#type: alloc_space_idx,
                 unit: bytes_idx,
             },
+            #[cfg(feature = "measure_free")]
             protos::ValueType {
                 r#type: inuse_objects_idx,
                 unit: count_idx,
             },
+            #[cfg(feature = "measure_free")]
             protos::ValueType {
                 r#type: inuse_space_idx,
                 unit: bytes_idx,
@@ -320,11 +329,14 @@ struct ProfilerState<const N: usize> {
     collector: collector::Collector<Frames<N>>,
     allocated_objects: isize,
     allocated_bytes: isize,
+    #[cfg(feature = "measure_free")]
     freed_objects: isize,
+    #[cfg(feature = "measure_free")]
     freed_bytes: isize,
     // take a sample when allocated crosses this threshold
     next_sample: isize,
     // take a sample when free crosses this threshold
+    #[cfg(feature = "measure_free")]
     next_free_sample: isize,
     // take a sample every period bytes.
     period: usize,
@@ -337,9 +349,12 @@ impl<const N: usize> ProfilerState<N> {
             period,
             allocated_objects: 0,
             allocated_bytes: 0,
+            #[cfg(feature = "measure_free")]
             freed_objects: 0,
+            #[cfg(feature = "measure_free")]
             freed_bytes: 0,
             next_sample: period as isize,
+            #[cfg(feature = "measure_free")]
             next_free_sample: period as isize,
         }
     }
