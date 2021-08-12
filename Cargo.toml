@@ -24,7 +24,7 @@ backtrace = "0.3.59"
 bytes = "1.0.1"
 lazy_static = "1.4.0"
 libc = { version = "^0.2.8", default-features = false }
-pprof = {version = "0.5.0", features = [ "flamegraph", "protobuf" ] }
+pprof = {version = "^0.5", features = [ "flamegraph", "protobuf" ] }
 prost = "0.8"
 spin = "0.9.0"
 tikv-jemalloc-sys = { version = "0.4", optional = true, features = [ "stats" ] }
