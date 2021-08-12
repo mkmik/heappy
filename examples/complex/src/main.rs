@@ -1,9 +1,7 @@
-use std::io::Write;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::{thread, time};
 
 use croaring::Bitmap;
-use prost::Message;
 
 static ITERATIONS: AtomicU64 = AtomicU64::new(0);
 
@@ -91,15 +89,10 @@ fn demo() {
     let mut file = std::fs::File::create(filename).unwrap();
     report.flamegraph(&mut file);
 
-    let proto = report.pprof();
-
-    let mut buf = vec![];
-    proto.encode(&mut buf).unwrap();
-    println!("proto size: {}", buf.len());
     let filename = "/tmp/memflame.pb";
     println!("Writing to {}", filename);
     let mut file = std::fs::File::create(filename).unwrap();
-    file.write_all(&buf).unwrap();
+    report.write_pprof(&mut file).unwrap();
 }
 
 fn main() {
