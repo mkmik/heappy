@@ -239,6 +239,8 @@ impl HeapReport {
                 value: vec![
                     rec.alloc_objects as i64,
                     rec.alloc_bytes as i64,
+                    -rec.free_objects as i64,
+                    -rec.free_bytes as i64,
                     rec.in_use_objects() as i64,
                     rec.in_use_bytes() as i64,
                 ],
@@ -260,6 +262,10 @@ impl HeapReport {
         let alloc_space_idx = push_string("alloc_space");
         let bytes_idx = push_string("bytes");
         #[cfg(feature = "measure_free")]
+        let free_objects_idx = push_string("free_objects");
+        #[cfg(feature = "measure_free")]
+        let free_space_idx = push_string("free_space");
+        #[cfg(feature = "measure_free")]
         let inuse_objects_idx = push_string("inuse_objects");
         #[cfg(feature = "measure_free")]
         let inuse_space_idx = push_string("inuse_space");
@@ -273,6 +279,16 @@ impl HeapReport {
             protos::ValueType {
                 r#type: alloc_space_idx,
                 unit: bytes_idx,
+            },
+            #[cfg(feature = "measure_free")]
+            protos::ValueType {
+                r#type: free_objects_idx,
+                unit: count_idx,
+            },
+            #[cfg(feature = "measure_free")]
+            protos::ValueType {
+                r#type: free_space_idx,
+                unit: count_idx,
             },
             #[cfg(feature = "measure_free")]
             protos::ValueType {
