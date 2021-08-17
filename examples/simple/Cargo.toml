@@ -5,5 +5,5 @@ authors = [ "Marko Mikulicic <mkm@influxdata.com>" ]
 edition = "2018"
 
 [dependencies]
-heappy = { path = "../..", features = [ "enable_heap_profiler" ] }
+heappy = { path = "../..", features = [ "enable_heap_profiler", "measure_free" ] }
 prost = "0.7"
