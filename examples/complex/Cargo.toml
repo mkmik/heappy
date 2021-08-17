@@ -6,5 +6,5 @@ edition = "2018"
 
 [dependencies]
 croaring = "0.5.0"
-heappy = { path = "../..", features = [ "enable_heap_profiler" ] }
+heappy = { path = "../..", features = [ "enable_heap_profiler", "measure_free" ] }
 prost = "0.7"
