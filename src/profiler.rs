@@ -239,8 +239,8 @@ impl HeapReport {
                 value: vec![
                     rec.alloc_objects as i64,
                     rec.alloc_bytes as i64,
-                    -rec.free_objects as i64,
-                    -rec.free_bytes as i64,
+                    rec.free_objects as i64,
+                    rec.free_bytes as i64,
                     rec.in_use_objects() as i64,
                     rec.in_use_bytes() as i64,
                 ],
