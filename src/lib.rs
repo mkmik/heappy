@@ -3,7 +3,13 @@ pub use profiler::*;
 
 mod collector;
 #[cfg(feature = "jemalloc_shim")]
-mod jemalloc_shim;
+mod hook;
+
+#[cfg(feature = "jemalloc_shim")]
+mod jemalloc_adapter;
+
+#[cfg(feature = "jemalloc_shim")]
+use jemalloc_adapter as adapter;
 
 // On linux you need to reference at least one symbol in a module if we want it be be actually linked.
 // Otherwise the hooks like `pub unsafe extern "C" fn malloc(size: size_t) -> *mut c_void` defined in the shim
@@ -12,5 +18,5 @@ mod jemalloc_shim;
 // (e.g. the functions that override weak symbols exported by libc)
 #[cfg(feature = "jemalloc_shim")]
 pub fn dummy_force_link() {
-    jemalloc_shim::dummy_force_link();
+    hook::dummy_force_link();
 }
