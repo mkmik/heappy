@@ -28,6 +28,3 @@ extern "C" {
     #[link_name = "_rjem_aligned_alloc"]
     pub fn sys_aligned_alloc(alignment: size_t, size: size_t) -> *mut c_void;
 }
-
-// On linux we need to reference at least one symbol in a module for it to not be pruned at link time.
-pub(crate) fn dummy_force_link_jemalloc() {}
