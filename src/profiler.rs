@@ -2,11 +2,15 @@ use std::cell::Cell;
 use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::io::Write;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Mutex, MutexGuard,
+};
 
 use backtrace::Frame;
 use prost::Message;
 use spin::RwLock;
+use thiserror::Error;
 
 use crate::collector;
 
@@ -16,15 +20,29 @@ static HEAP_PROFILER_ENABLED: AtomicBool = AtomicBool::new(false);
 
 lazy_static::lazy_static! {
     static ref HEAP_PROFILER_STATE: RwLock<ProfilerState<MAX_DEPTH>> = RwLock::new(Default::default());
+    static ref HEAP_PROFILER_ENTER: Mutex<()> = Mutex::new(());
 }
 
+#[derive(Error, Debug)]
+pub enum Error {
+    #[error("attempting to run a heap profiler while the another heap profiler is being run")]
+    ConcurrentHeapProfiler,
+}
+
+pub type Result<T, E = Error> = std::result::Result<T, E>;
+
 /// RAII structure used to stop profiling when dropped. It is the only interface to access the heap profiler.
-pub struct HeapProfilerGuard {}
+pub struct HeapProfilerGuard {
+    _guard: MutexGuard<'static, ()>,
+}
 
 impl HeapProfilerGuard {
-    pub fn new(period: usize) -> Self {
+    pub fn new(period: usize) -> Result<Self> {
+        let guard = HEAP_PROFILER_ENTER
+            .try_lock()
+            .map_err(|_| Error::ConcurrentHeapProfiler)?;
         Profiler::start(period);
-        Self {}
+        Ok(Self { _guard: guard })
     }
 
     pub fn report(self) -> HeapReport {
@@ -475,5 +493,20 @@ impl<const N: usize> From<Frames<N>> for pprof::Frames {
             thread_name: "".to_string(),
             thread_id: 0,
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_reentrant() {
+        let _guard = HeapProfilerGuard::new(1).unwrap();
+
+        assert!(matches!(
+            HeapProfilerGuard::new(1),
+            Err(Error::ConcurrentHeapProfiler)
+        ));
     }
 }

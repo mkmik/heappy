@@ -308,6 +308,7 @@ dependencies = [
  "pprof",
  "prost 0.8.0",
  "spin",
+ "thiserror",
  "tikv-jemalloc-sys",
 ]
 
