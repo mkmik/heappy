@@ -5,7 +5,7 @@ fn work() {
 
 fn demo() {
     // Using a period of 1 to catch all allocations.
-    let heap_profiler_guard = heappy::HeapProfilerGuard::new(1);
+    let heap_profiler_guard = heappy::HeapProfilerGuard::new(1).unwrap();
 
     work();
 
