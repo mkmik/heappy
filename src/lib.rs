@@ -9,7 +9,7 @@ mod hook;
 mod jemalloc_adapter;
 
 #[cfg(feature = "jemalloc_shim")]
-use jemalloc_adapter as adapter;
+pub mod adapter;
 
 // On linux you need to reference at least one symbol in a module if we want it be be actually linked.
 // Otherwise the hooks like `pub unsafe extern "C" fn malloc(size: size_t) -> *mut c_void` defined in the shim

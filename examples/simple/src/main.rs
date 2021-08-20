@@ -7,6 +7,8 @@ fn demo() {
     // Using a period of 1 to catch all allocations.
     let heap_profiler_guard = heappy::HeapProfilerGuard::new(1).unwrap();
 
+    let leak = Box::new(42u64);
+
     work();
 
     let report = heap_profiler_guard.report();
@@ -20,6 +22,8 @@ fn demo() {
     println!("Writing to {}", filename);
     let mut file = std::fs::File::create(filename).unwrap();
     report.write_pprof(&mut file).unwrap();
+
+    println!("{:?}", leak);
 }
 
 fn main() {

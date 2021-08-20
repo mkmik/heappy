@@ -18,6 +18,8 @@ default = []
 jemalloc_shim = [ "tikv-jemalloc-sys" ]
 enable_heap_profiler = [ "jemalloc_shim" ]
 measure_free = []
+magic_number = []
+assert_magic_number = [ "magic_number" ]
 
 [dependencies]
 backtrace = "0.3.59"

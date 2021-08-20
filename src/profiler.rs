@@ -14,7 +14,7 @@ use thiserror::Error;
 
 use crate::collector;
 
-const MAX_DEPTH: usize = 32;
+pub const MAX_DEPTH: usize = 32;
 
 static HEAP_PROFILER_ENABLED: AtomicBool = AtomicBool::new(false);
 
@@ -57,6 +57,10 @@ impl Drop for HeapProfilerGuard {
     }
 }
 
+pub trait Backtracer {
+    fn backtrace(&mut self, create_if_missing: bool) -> Frames<MAX_DEPTH>;
+}
+
 pub struct Profiler;
 
 impl Profiler {
@@ -81,7 +85,7 @@ impl Profiler {
     }
 
     // Called by malloc hooks to record a memory allocation event.
-    pub(crate) unsafe fn track_allocated(size: isize) {
+    pub(crate) unsafe fn track_allocated<T: Backtracer>(size: isize, backtracer: &mut T) {
         thread_local!(static ENTERED: Cell<bool> = Cell::new(false));
 
         struct ResetOnDrop;
@@ -129,10 +133,7 @@ impl Profiler {
                 }
 
                 if sample_now {
-                    let mut bt = Frames::new();
-                    // we're already holding a lock
-                    backtrace::trace_unsynchronized(|frame| bt.push(frame));
-
+                    let bt = backtracer.backtrace(size > 0);
                     profiler.collector.record(bt, size);
                 }
             }
@@ -400,7 +401,7 @@ impl<const N: usize> Default for ProfilerState<N> {
     }
 }
 
-struct Frames<const N: usize> {
+pub struct Frames<const N: usize> {
     frames: [Frame; N],
     size: usize,
 }
@@ -417,7 +418,7 @@ impl<const N: usize> Clone for Frames<N> {
 }
 
 impl<const N: usize> Frames<N> {
-    unsafe fn new() -> Self {
+    pub unsafe fn new() -> Self {
         Self {
             frames: std::mem::MaybeUninit::uninit().assume_init(),
             size: 0,
@@ -425,7 +426,7 @@ impl<const N: usize> Frames<N> {
     }
 
     /// Push will push up to N frames in the frames array.
-    unsafe fn push(&mut self, frame: &Frame) -> bool {
+    pub unsafe fn push(&mut self, frame: &Frame) -> bool {
         self.frames[self.size] = frame.clone();
         self.size += 1;
         self.size < N
