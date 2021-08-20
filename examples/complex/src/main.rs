@@ -71,7 +71,7 @@ fn worker() {
 }
 
 fn demo() {
-    let heap_profiler_guard = heappy::HeapProfilerGuard::new(1);
+    let heap_profiler_guard = heappy::HeapProfilerGuard::new(1).unwrap();
 
     println!("start demo");
 
