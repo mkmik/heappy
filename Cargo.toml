@@ -21,7 +21,7 @@ measure_free = []
 
 [dependencies]
 backtrace = "0.3.63"
-bytes = "1.0.1"
+bytes = "1.1.0"
 lazy_static = "1.4.0"
 libc = { version = "^0.2.8", default-features = false }
 pprof = {version = "^0.5", features = [ "flamegraph", "protobuf" ] }
