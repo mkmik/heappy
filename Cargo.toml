@@ -23,7 +23,7 @@ measure_free = []
 backtrace = "0.3.63"
 bytes = "1.1.0"
 lazy_static = "1.4.0"
-libc = { version = "^0.2.8", default-features = false }
+libc = { version = "^0.2.108", default-features = false }
 pprof = {version = "^0.5", features = [ "flamegraph", "protobuf" ] }
 prost = "0.8"
 spin = "0.9.0"
