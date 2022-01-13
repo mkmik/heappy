@@ -8,7 +8,7 @@ use std::sync::{
 };
 
 use backtrace::Frame;
-use prost::Message;
+use pprof::protos::Message;
 use spin::RwLock;
 use thiserror::Error;
 
@@ -174,7 +174,9 @@ impl HeapReport {
             .map(|(frames, rec)| (frames.clone(), rec.alloc_bytes))
             .collect();
 
-        let report = pprof::Report { data };
+        let timing = Default::default();
+
+        let report = pprof::Report { data, timing };
 
         let mut options: pprof::flamegraph::Options = Default::default();
 
