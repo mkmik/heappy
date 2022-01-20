@@ -23,7 +23,7 @@ measure_free = []
 backtrace = "0.3.63"
 bytes = "1.1.0"
 lazy_static = "1.4.0"
-libc = { version = "^0.2.112", default-features = false }
+libc = { version = "^0.2.113", default-features = false }
 pprof = {version = "^0.6", features = [ "flamegraph", "protobuf" ] }
 spin = "0.9.2"
 tikv-jemalloc-sys = { version = "0.4", optional = true, features = [ "stats" ] }
