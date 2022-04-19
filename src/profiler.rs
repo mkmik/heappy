@@ -293,37 +293,37 @@ impl HeapReport {
 
         let sample_type = vec![
             protos::ValueType {
-                r#type: alloc_objects_idx,
+                ty: alloc_objects_idx,
                 unit: count_idx,
             },
             protos::ValueType {
-                r#type: alloc_space_idx,
+                ty: alloc_space_idx,
                 unit: bytes_idx,
             },
             #[cfg(feature = "measure_free")]
             protos::ValueType {
-                r#type: free_objects_idx,
+                ty: free_objects_idx,
                 unit: count_idx,
             },
             #[cfg(feature = "measure_free")]
             protos::ValueType {
-                r#type: free_space_idx,
+                ty: free_space_idx,
                 unit: count_idx,
             },
             #[cfg(feature = "measure_free")]
             protos::ValueType {
-                r#type: inuse_objects_idx,
+                ty: inuse_objects_idx,
                 unit: count_idx,
             },
             #[cfg(feature = "measure_free")]
             protos::ValueType {
-                r#type: inuse_space_idx,
+                ty: inuse_space_idx,
                 unit: bytes_idx,
             },
         ];
 
         let period_type = Some(pprof::protos::ValueType {
-            r#type: space_idx,
+            ty: space_idx,
             unit: bytes_idx,
         });
 
