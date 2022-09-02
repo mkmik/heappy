@@ -6,6 +6,7 @@ use croaring::Bitmap;
 static ITERATIONS: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Debug)]
+#[allow(dead_code)]
 struct Foo {
     i: i32,
     v: Vec<u8>,
