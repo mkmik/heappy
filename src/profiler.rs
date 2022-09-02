@@ -7,6 +7,7 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
     Mutex, MutexGuard,
 };
+use std::time::SystemTime;
 
 use backtrace::Frame;
 use pprof::protos::Message;
@@ -406,6 +407,7 @@ impl<const N: usize> Default for ProfilerState<N> {
 struct Frames<const N: usize> {
     frames: [MaybeUninit<Frame>; N],
     size: usize,
+    ts: SystemTime,
 }
 
 impl<const N: usize> Clone for Frames<N> {
@@ -415,6 +417,7 @@ impl<const N: usize> Clone for Frames<N> {
             n.frames[i].write(unsafe { self.frames[i].assume_init_ref().clone() });
         }
         n.size = self.size;
+        n.ts = self.ts;
         n
     }
 }
@@ -424,6 +427,7 @@ impl<const N: usize> Frames<N> {
         Self {
             frames: std::array::from_fn(|_| MaybeUninit::uninit()),
             size: 0,
+            ts: SystemTime::now(),
         }
     }
 
@@ -496,6 +500,7 @@ impl<const N: usize> From<Frames<N>> for pprof::Frames {
             frames,
             thread_name: "".to_string(),
             thread_id: 0,
+            sample_timestamp: bt.ts,
         }
     }
 }
