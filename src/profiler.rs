@@ -2,10 +2,12 @@ use std::cell::Cell;
 use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::io::Write;
+use std::mem::MaybeUninit;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Mutex, MutexGuard,
 };
+use std::time::SystemTime;
 
 use backtrace::Frame;
 use pprof::protos::Message;
@@ -403,32 +405,36 @@ impl<const N: usize> Default for ProfilerState<N> {
 }
 
 struct Frames<const N: usize> {
-    frames: [Frame; N],
+    frames: [MaybeUninit<Frame>; N],
     size: usize,
+    ts: SystemTime,
 }
 
 impl<const N: usize> Clone for Frames<N> {
     fn clone(&self) -> Self {
-        let mut n = unsafe { Self::new() };
+        let mut n = Self::new();
         for i in 0..self.size {
-            n.frames[i] = self.frames[i].clone()
+            n.frames[i].write(unsafe { self.frames[i].assume_init_ref().clone() });
         }
         n.size = self.size;
+        n.ts = self.ts;
         n
     }
 }
 
 impl<const N: usize> Frames<N> {
-    unsafe fn new() -> Self {
+    fn new() -> Self {
         Self {
-            frames: std::mem::MaybeUninit::uninit().assume_init(),
+            frames: std::array::from_fn(|_| MaybeUninit::uninit()),
             size: 0,
+            ts: SystemTime::now(),
         }
     }
 
     /// Push will push up to N frames in the frames array.
-    unsafe fn push(&mut self, frame: &Frame) -> bool {
-        self.frames[self.size] = frame.clone();
+    fn push(&mut self, frame: &Frame) -> bool {
+        assert!(self.size < N);
+        self.frames[self.size].write(frame.clone());
         self.size += 1;
         self.size < N
     }
@@ -462,7 +468,7 @@ impl<'a, const N: usize> Iterator for FramesIterator<'a, N> {
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.1 < self.0.size {
-            let res = Some(&self.0.frames[self.1]);
+            let res = Some(unsafe { self.0.frames[self.1].assume_init_ref() });
             self.1 += 1;
             res
         } else {
@@ -494,6 +500,7 @@ impl<const N: usize> From<Frames<N>> for pprof::Frames {
             frames,
             thread_name: "".to_string(),
             thread_id: 0,
+            sample_timestamp: bt.ts,
         }
     }
 }
