@@ -20,7 +20,7 @@ enable_heap_profiler = [ "jemalloc_shim" ]
 measure_free = []
 
 [dependencies]
-backtrace = "0.3.66"
+backtrace = "0.3.67"
 bytes = "1.2.1"
 lazy_static = "1.4.0"
 libc = { version = "^0.2.138", default-features = false }
