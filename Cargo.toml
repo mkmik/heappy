@@ -3,6 +3,7 @@ name = "heappy"
 version = "0.1.0"
 authors = [ "Marko Mikulicic <mkm@influxdata.com>" ]
 edition = "2021"
+license = "Apache-2.0"
 
 [workspace]
 members = [
